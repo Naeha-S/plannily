@@ -166,8 +166,7 @@ const LandingPage = () => {
                 <div className="container mx-auto flex h-16 items-center justify-between px-6 max-w-7xl">
                     {/* Logo */}
                     <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                        <img src="/plannily_logo.png" alt="Plannily Logo" className="h-8 w-8 object-contain" />
-                        <span className="text-xl font-bold tracking-tight text-stone-900 font-serif">Plannily</span>
+                        <img src="/plannily_logo.png" alt="Plannily Logo" className="h-10 w-auto object-contain" />
                     </div>
 
                     {/* Desktop Nav */}

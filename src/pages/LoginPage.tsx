@@ -68,10 +68,11 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4 py-12">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 px-4 py-12">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
                 className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-stone-100"
             >
                 <div className="p-8 md:p-10">
@@ -89,7 +90,8 @@ const LoginPage = () => {
                             <label className="block text-sm font-medium text-stone-700 ml-1">Email Address</label>
                             <div className="relative group">
                                 <Mail className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
-                                <input
+                                <motion.input
+                                    whileFocus={{ scale: 1.01 }}
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -104,7 +106,8 @@ const LoginPage = () => {
                             <label className="block text-sm font-medium text-stone-700 ml-1">Password</label>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
-                                <input
+                                <motion.input
+                                    whileFocus={{ scale: 1.01 }}
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -143,16 +146,18 @@ const LoginPage = () => {
                             )}
                         </AnimatePresence>
 
-                        <Button type="submit" className="w-full py-4 text-lg" disabled={loading}>
-                            {loading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <span className="flex items-center justify-center gap-2">
-                                    {isLogin ? 'Sign In' : 'Sign Up'}
-                                    <ArrowRight className="w-4 h-4" />
-                                </span>
-                            )}
-                        </Button>
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                            <Button type="submit" className="w-full py-4 text-lg" disabled={loading}>
+                                {loading ? (
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <span className="flex items-center justify-center gap-2">
+                                        {isLogin ? 'Sign In' : 'Sign Up'}
+                                        <ArrowRight className="w-4 h-4" />
+                                    </span>
+                                )}
+                            </Button>
+                        </motion.div>
                     </form>
 
                     <div className="mt-8 pt-6 border-t border-stone-100 text-center">

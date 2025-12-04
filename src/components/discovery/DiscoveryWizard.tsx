@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../common/Button';
-import { ArrowRight, ArrowLeft, Check, Calendar } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Calendar, Plane } from 'lucide-react';
 
 interface DiscoveryData {
     vibes: string[];
@@ -9,6 +9,7 @@ interface DiscoveryData {
     companions: string;
     travelStyle: string;
     budget: string;
+    origin: string;
     startDate: string;
     endDate: string;
     duration: number;
@@ -61,6 +62,7 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
         companions: '',
         travelStyle: '',
         budget: '',
+        origin: '',
         startDate: '',
         endDate: '',
         duration: 0,
@@ -221,8 +223,22 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
                         className="flex-grow space-y-8"
                     >
                         <div>
-                            <h2 className="text-2xl font-bold mb-2">When & How much?</h2>
-                            <p className="text-slate-600 mb-6">Final details to find your perfect match.</p>
+                            <h2 className="text-2xl font-bold mb-2">Logistics</h2>
+                            <p className="text-slate-600 mb-6">Where are you starting from and when?</p>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Flying from (City)</label>
+                                <div className="relative">
+                                    <Plane className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. New York, London, Dubai"
+                                        value={data.origin}
+                                        onChange={(e) => setData({ ...data, origin: e.target.value })}
+                                        className="w-full p-3 pl-12 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                                    />
+                                </div>
+                            </div>
 
                             <div className="grid md:grid-cols-2 gap-6 mb-8">
                                 <div>
@@ -302,7 +318,7 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
                         Next <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                 ) : (
-                    <Button onClick={() => onComplete(data)} disabled={!data.budget || !data.startDate || !data.endDate}>
+                    <Button onClick={() => onComplete(data)} disabled={!data.budget || !data.startDate || !data.endDate || !data.origin}>
                         Find Destinations <Check className="w-4 h-4 ml-2" />
                     </Button>
                 )}
