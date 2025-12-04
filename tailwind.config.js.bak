@@ -1,0 +1,23 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+    content: [
+        "./index.html",
+        "./src/**/*.{js,ts,jsx,tsx}",
+    ],
+    theme: {
+        extend: {
+            colors: {
+                // Custom colors based on "light ivory background" and "vibrant colors"
+                background: '#FFFFF0', // Ivory
+                primary: '#FF5A5F', // Example vibrant color (Airbnb-ish red/pink) or maybe a Teal?
+                secondary: '#00A699',
+                accent: '#FC642D',
+                text: '#484848',
+            },
+            fontFamily: {
+                sans: ['Inter', 'sans-serif'], // Will need to import Inter
+            }
+        },
+    },
+    plugins: [],
+}
