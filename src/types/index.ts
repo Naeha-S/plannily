@@ -36,3 +36,19 @@ export interface Activity {
     cost?: number;
     imageUrl?: string;
 }
+
+export interface TripEvent {
+    id: string;
+    name: string;
+    date: string;
+    description: string;
+    location: string;
+    type: 'festival' | 'concert' | 'exhibition' | 'sports' | 'other';
+    imageUrl?: string;
+}
+
+export interface Itinerary {
+    destination: string;
+    days: ItineraryDay[];
+    events?: TripEvent[];
+}

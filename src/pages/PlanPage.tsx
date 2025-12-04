@@ -3,7 +3,7 @@ import { PlannerInput } from '../components/planner/PlannerInput';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
 import { Sparkles, AlertCircle, Plane } from 'lucide-react';
-import { generateItinerary } from '../services/ai';
+import { generateItinerary, regenerateDay } from '../services/ai';
 import { searchFlights } from '../services/amadeus';
 import { Button } from '../components/common/Button';
 
@@ -53,6 +53,31 @@ const PlanPage = () => {
         }
     };
 
+    const handleRegenerateDay = async (dayIndex: number) => {
+        if (!planData) return;
+
+        // Optimistic UI update or loading state could go here
+        // For now, let's just show a loading toast or similar if we had one.
+        // We'll use a simple alert or just rely on the UI updating eventually.
+        // Better: Set a local loading state for that day if possible, but for now global loading is safer.
+        setLoading(true);
+
+        try {
+            const newDay = await regenerateDay(planData, dayIndex);
+
+            const newDays = [...itinerary];
+            newDays[dayIndex] = newDay;
+
+            setItinerary(newDays);
+            setPlanData({ ...planData, days: newDays });
+        } catch (err) {
+            console.error('Failed to regenerate day', err);
+            alert('Failed to regenerate day. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-[80vh] flex flex-col items-center justify-center bg-[var(--color-background)]">
@@ -93,7 +118,9 @@ const PlanPage = () => {
                 <ItineraryView
                     destination={planData.destination}
                     days={itinerary}
+                    events={planData.events}
                     onEdit={() => console.log('Edit')}
+                    onRegenerateDay={handleRegenerateDay}
                 />
             </div>
         );

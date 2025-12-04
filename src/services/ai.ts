@@ -64,6 +64,10 @@ const generateWithFallback = async (prompt: string) => {
   }
 };
 
+import { getUnsplashImage } from './unsplash';
+
+// ... (imports)
+
 export const generateDestinations = async (preferences: any) => {
   const prompt = `
     Suggest 3 destinations + 2 alternatives based on:
@@ -80,7 +84,7 @@ export const generateDestinations = async (preferences: any) => {
           "name": "City, Country",
           "country": "Country Name",
           "description": "1 sentence reason.",
-          "imageUrl": "https://placehold.co/800x600?text={destination_name}",
+          "imageQuery": "Search term for Unsplash (e.g. 'Paris Eiffel Tower')",
           "matchScore": number (0-100),
           "tags": ["tag1", "tag2", "tag3"],
           "weather": { "temp": number, "condition": "String" },
@@ -93,7 +97,15 @@ export const generateDestinations = async (preferences: any) => {
   try {
     const text = await generateWithFallback(prompt);
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanText);
+    const data = JSON.parse(cleanText);
+
+    // Hydrate with Unsplash images
+    const destinationsWithImages = await Promise.all(data.destinations.map(async (dest: any) => ({
+      ...dest,
+      imageUrl: await getUnsplashImage(dest.imageQuery || dest.name)
+    })));
+
+    return { destinations: destinationsWithImages };
   } catch (error) {
     console.error('Error generating destinations:', error);
     throw error;
@@ -102,11 +114,24 @@ export const generateDestinations = async (preferences: any) => {
 
 export const generateItinerary = async (request: any) => {
   const prompt = `
-    Create ${request.days} day itinerary for ${request.destination}. Budget: ${request.budget}.
+    Create a ${request.days} day itinerary for ${request.destination}. Budget: ${request.budget}.
+    
+    CRITICAL: Identify 1-2 unique seasonal events/festivals occurring in ${request.destination} (assume current season if date not specified) that would be special to attend.
     
     Return strictly valid JSON (no markdown):
     {
       "destination": "${request.destination}",
+      "events": [
+        {
+          "id": "evt_1",
+          "name": "Event Name",
+          "date": "YYYY-MM-DD (approximate)",
+          "description": "Short description",
+          "location": "Venue/Area",
+          "type": "festival|concert|exhibition|sports|other",
+          "imageQuery": "Search term"
+        }
+      ],
       "days": [
         {
           "day": number,
@@ -119,7 +144,7 @@ export const generateItinerary = async (request: any) => {
               "endTime": "HH:MM",
               "description": "Very short description",
               "location": "Place",
-              "imageUrl": "https://placehold.co/800x600?text={activity_name}"
+              "imageQuery": "Search term"
             }
           ]
         }
@@ -130,9 +155,60 @@ export const generateItinerary = async (request: any) => {
   try {
     const text = await generateWithFallback(prompt);
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanText);
+    const data = JSON.parse(cleanText);
+
+    // Hydrate Events with Images
+    if (data.events) {
+      data.events = await Promise.all(data.events.map(async (evt: any) => ({
+        ...evt,
+        imageUrl: await getUnsplashImage(evt.imageQuery || evt.name + ' ' + data.destination)
+      })));
+    }
+
+    // Hydrate Activities with Images
+    data.days = await Promise.all(data.days.map(async (day: any) => ({
+      ...day,
+      activities: await Promise.all(day.activities.map(async (act: any) => ({
+        ...act,
+        imageUrl: await getUnsplashImage(act.imageQuery || act.name + ' ' + data.destination)
+      })))
+    })));
+
+    return data;
   } catch (error) {
     console.error('Error generating itinerary:', error);
+    throw error;
+  }
+};
+
+export const regenerateDay = async (currentItinerary: any, dayIndex: number) => {
+  const day = currentItinerary.days[dayIndex];
+  const prompt = `
+        Regenerate Day ${day.day} for a trip to ${currentItinerary.destination}.
+        Previous plan was: ${JSON.stringify(day.activities.map((a: any) => a.name))}.
+        Create a COMPLETELY DIFFERENT set of activities for this day.
+        
+        Return strictly valid JSON for a single day object:
+        {
+          "day": ${day.day},
+          "activities": [ ... (same structure as before with imageQuery) ]
+        }
+    `;
+
+  try {
+    const text = await generateWithFallback(prompt);
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const newDay = JSON.parse(cleanText);
+
+    // Hydrate images
+    newDay.activities = await Promise.all(newDay.activities.map(async (act: any) => ({
+      ...act,
+      imageUrl: await getUnsplashImage(act.imageQuery || act.name + ' ' + currentItinerary.destination)
+    })));
+
+    return newDay;
+  } catch (error) {
+    console.error('Error regenerating day:', error);
     throw error;
   }
 };

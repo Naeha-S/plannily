@@ -1,141 +1,142 @@
 import { useState } from 'react';
-import { DayTimeline } from './DayTimeline';
-import type { ItineraryDay } from '../../types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, MapPin, Navigation, RefreshCw, Calendar as CalendarIcon } from 'lucide-react';
+import type { ItineraryDay, TripEvent } from '../../types';
 import { Button } from '../common/Button';
-import { Share2, Download, Edit3, Send, Bot } from 'lucide-react';
-import { chatWithAI } from '../../services/ai';
 
 interface ItineraryViewProps {
     destination: string;
     days: ItineraryDay[];
+    events?: TripEvent[];
     onEdit: () => void;
+    onRegenerateDay?: (dayIndex: number) => void;
 }
 
-export const ItineraryView = ({ destination, days, onEdit }: ItineraryViewProps) => {
-    const [chatInput, setChatInput] = useState('');
-    const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai'; message: string }[]>([]);
-    const [isChatting, setIsChatting] = useState(false);
-
-    const handleChatSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!chatInput.trim()) return;
-
-        const userMessage = chatInput;
-        setChatInput('');
-        setChatHistory((prev) => [...prev, { role: 'user', message: userMessage }]);
-        setIsChatting(true);
-
-        try {
-            const response = await chatWithAI(userMessage, { destination, days });
-            setChatHistory((prev) => [...prev, { role: 'ai', message: response }]);
-        } catch (error) {
-            setChatHistory((prev) => [...prev, { role: 'ai', message: 'Sorry, I encountered an error. Please try again.' }]);
-        } finally {
-            setIsChatting(false);
-        }
-    };
+export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateDay }: ItineraryViewProps) => {
+    const [selectedDay, setSelectedDay] = useState(0);
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Your Trip to {destination}</h1>
-                    <p className="text-slate-600">Optimized for culture, food, and relaxation.</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                        <Share2 className="w-4 h-4 mr-2" /> Share
-                    </Button>
-                    <Button variant="outline" size="sm">
-                        <Download className="w-4 h-4 mr-2" /> Save
-                    </Button>
-                    <Button onClick={onEdit} size="sm">
-                        <Edit3 className="w-4 h-4 mr-2" /> Edit
-                    </Button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    {days.map((day) => (
-                        <DayTimeline key={day.day} day={day} />
-                    ))}
+        <div className="flex flex-col lg:flex-row gap-8">
+            {/* Sidebar: Days & Events */}
+            <div className="w-full lg:w-80 flex-shrink-0 space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
+                    <h2 className="text-xl font-bold text-stone-900 mb-4 font-serif">{destination}</h2>
+                    <div className="space-y-2">
+                        {days.map((day, index) => (
+                            <button
+                                key={day.day}
+                                onClick={() => setSelectedDay(index)}
+                                className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between ${selectedDay === index
+                                    ? 'bg-[var(--color-primary)] text-white shadow-md'
+                                    : 'hover:bg-stone-50 text-stone-600'
+                                    }`}
+                            >
+                                <span className="font-medium">Day {day.day}</span>
+                                {selectedDay === index && <div className="w-2 h-2 bg-white rounded-full" />}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="lg:col-span-1">
-                    <div className="sticky top-24 space-y-6">
-                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                            <h3 className="font-bold mb-4">Trip Summary</h3>
-                            <div className="space-y-3 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-600">Duration</span>
-                                    <span className="font-medium">{days.length} Days</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-600">Est. Cost</span>
-                                    <span className="font-medium">$2,450</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-600">Pace</span>
-                                    <span className="font-medium text-green-600">Balanced</span>
-                                </div>
-                            </div>
+                {/* Events Section */}
+                {events && events.length > 0 && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
+                        <div className="flex items-center gap-2 mb-4 text-[var(--color-accent)]">
+                            <CalendarIcon size={20} />
+                            <h3 className="font-bold text-stone-900">Special Events</h3>
                         </div>
-
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[500px]">
-                            <div className="p-4 border-b border-slate-100 bg-primary/5 flex items-center gap-2">
-                                <Bot className="w-5 h-5 text-primary" />
-                                <h3 className="font-bold text-slate-900">AI Travel Assistant</h3>
-                            </div>
-
-                            <div className="flex-grow overflow-y-auto p-4 space-y-4">
-                                {chatHistory.length === 0 && (
-                                    <p className="text-sm text-slate-500 text-center mt-4">
-                                        Ask me anything! I can help you swap days, find restaurants, or check the weather.
-                                    </p>
-                                )}
-                                {chatHistory.map((msg, idx) => (
-                                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user'
-                                                ? 'bg-primary text-white rounded-br-none'
-                                                : 'bg-slate-100 text-slate-800 rounded-bl-none'
-                                            }`}>
-                                            {msg.message}
+                        <div className="space-y-4">
+                            {events.map((evt) => (
+                                <div key={evt.id} className="group cursor-pointer">
+                                    <div className="aspect-video rounded-lg overflow-hidden mb-2 relative">
+                                        <img src={evt.imageUrl} alt={evt.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                        <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+                                            {evt.type}
                                         </div>
                                     </div>
-                                ))}
-                                {isChatting && (
-                                    <div className="flex justify-start">
-                                        <div className="bg-slate-100 rounded-2xl px-4 py-2 rounded-bl-none">
-                                            <div className="flex gap-1">
-                                                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    <h4 className="font-bold text-stone-900 text-sm leading-tight">{evt.name}</h4>
+                                    <p className="text-xs text-stone-500 mt-1">{evt.date} • {evt.location}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Main Content: Activities */}
+            <div className="flex-grow">
+                <div className="bg-white rounded-3xl shadow-sm border border-stone-100 p-8 min-h-[600px]">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-3xl font-bold text-stone-900 font-serif">Day {days[selectedDay]?.day} Itinerary</h2>
+                        <div className="flex gap-2">
+                            {onRegenerateDay && (
+                                <Button variant="outline" size="sm" onClick={() => onRegenerateDay(selectedDay)}>
+                                    <RefreshCw className="w-4 h-4 mr-2" /> Regenerate Day
+                                </Button>
+                            )}
+                            <Button variant="outline" size="sm" onClick={onEdit}>
+                                Edit Plan
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-8 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-stone-100">
+                        <AnimatePresence mode="wait">
+                            {days[selectedDay]?.activities.map((activity, index) => (
+                                <motion.div
+                                    key={activity.id}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="relative pl-12"
+                                >
+                                    {/* Timeline Dot */}
+                                    <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-white border-2 border-[var(--color-primary)] flex items-center justify-center z-10">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]" />
+                                    </div>
+
+                                    <div className="bg-stone-50 rounded-2xl p-6 hover:shadow-md transition-shadow border border-stone-100">
+                                        <div className="flex flex-col md:flex-row gap-6">
+                                            {/* Image */}
+                                            <div className="w-full md:w-48 h-32 flex-shrink-0 rounded-xl overflow-hidden">
+                                                <img
+                                                    src={activity.imageUrl}
+                                                    alt={activity.name}
+                                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                                                />
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className="flex-grow">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <h3 className="text-xl font-bold text-stone-900">{activity.name}</h3>
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                                                        {activity.type}
+                                                    </span>
+                                                </div>
+                                                <p className="text-stone-600 mb-4 leading-relaxed text-sm">
+                                                    {activity.description}
+                                                </p>
+                                                <div className="flex flex-wrap gap-4 text-sm text-stone-500">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Clock size={16} className="text-[var(--color-primary)]" />
+                                                        {activity.startTime} - {activity.endTime}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <MapPin size={16} className="text-[var(--color-primary)]" />
+                                                        {activity.location}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 cursor-pointer hover:text-[var(--color-primary)] transition-colors">
+                                                        <Navigation size={16} className="text-[var(--color-primary)]" />
+                                                        Get Directions
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-
-                            <form onSubmit={handleChatSubmit} className="p-3 border-t border-slate-100 bg-slate-50">
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={chatInput}
-                                        onChange={(e) => setChatInput(e.target.value)}
-                                        placeholder="Ask for changes..."
-                                        className="w-full pl-4 pr-10 py-2 rounded-xl border border-slate-200 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={!chatInput.trim() || isChatting}
-                                        className="absolute right-2 top-1.5 p-1 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
-                                    >
-                                        <Send className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>
