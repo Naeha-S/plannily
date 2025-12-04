@@ -19,12 +19,6 @@ export interface Destination {
     costEstimate: number;
 }
 
-export interface ItineraryDay {
-    day: number;
-    date?: string;
-    activities: Activity[];
-}
-
 export interface Activity {
     id: string;
     name: string;
@@ -35,6 +29,17 @@ export interface Activity {
     location: string;
     cost?: number;
     imageUrl?: string;
+    travelTime?: string; // e.g., "15 mins walk"
+    travelCost?: number; // e.g., 5 (USD)
+    bookingRequired?: boolean;
+}
+
+export interface ItineraryDay {
+    day: number;
+    date?: string;
+    theme?: string; // e.g., "Historical Deep Dive"
+    activities: Activity[];
+    totalCost?: number;
 }
 
 export interface TripEvent {

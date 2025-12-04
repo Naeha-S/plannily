@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getUnsplashImage } from './unsplash';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
@@ -64,10 +65,6 @@ const generateWithFallback = async (prompt: string) => {
   }
 };
 
-import { getUnsplashImage } from './unsplash';
-
-// ... (imports)
-
 export const generateDestinations = async (preferences: any) => {
   const prompt = `
     Suggest 3 destinations + 2 alternatives based on:
@@ -114,9 +111,23 @@ export const generateDestinations = async (preferences: any) => {
 
 export const generateItinerary = async (request: any) => {
   const prompt = `
-    Create a ${request.days} day itinerary for ${request.destination}. Budget: ${request.budget}.
+    Act as a luxury travel planner. Create a detailed ${request.days}-day itinerary for ${request.travelers} people to ${request.destination}.
     
-    CRITICAL: Identify 1-2 unique seasonal events/festivals occurring in ${request.destination} (assume current season if date not specified) that would be special to attend.
+    Preferences:
+    - Budget: ${request.budget}
+    - Pace: ${request.pace} (Important: ${request.pace === 'relaxed' ? 'Include ample breaks and leisure time' : 'Maximize sightseeing'})
+    - Interests: ${request.interests.join(', ')}
+    
+    Constraints & Logic:
+    1. **Cohesion**: Group activities by neighborhood to minimize travel time. Don't jump across the city unnecessarily.
+    2. **Realism**: Include realistic travel times between locations (e.g., "20 mins Metro").
+    3. **Schedule**: 
+       - Morning: 1-2 activities
+       - Lunch: Specific restaurant recommendation
+       - Afternoon: 1-2 activities
+       - Evening: Dinner + Night activity (if applicable)
+    4. **Variety**: Mix sightseeing, food, and relaxation based on interests.
+    5. **Events**: Identify 1-2 unique seasonal events if possible.
     
     Return strictly valid JSON (no markdown):
     {
@@ -135,6 +146,7 @@ export const generateItinerary = async (request: any) => {
       "days": [
         {
           "day": number,
+          "theme": "Day Theme (e.g., 'Historic Old Town')",
           "activities": [
             {
               "id": "unique_string",
@@ -142,8 +154,11 @@ export const generateItinerary = async (request: any) => {
               "type": "sightseeing|food|relaxation|travel|activity",
               "startTime": "HH:MM",
               "endTime": "HH:MM",
-              "description": "Very short description",
-              "location": "Place",
+              "description": "Engaging description. Mention why it fits the user.",
+              "location": "Address or Area",
+              "cost": number (per person estimate in USD),
+              "travelTime": "e.g. 15 mins walk from previous",
+              "travelCost": number (estimate in USD),
               "imageQuery": "Search term"
             }
           ]
@@ -186,12 +201,14 @@ export const regenerateDay = async (currentItinerary: any, dayIndex: number) => 
   const prompt = `
         Regenerate Day ${day.day} for a trip to ${currentItinerary.destination}.
         Previous plan was: ${JSON.stringify(day.activities.map((a: any) => a.name))}.
-        Create a COMPLETELY DIFFERENT set of activities for this day.
+        
+        Goal: Create a COMPLETELY DIFFERENT set of activities for this day, maintaining logical routing and the user's original preferences.
         
         Return strictly valid JSON for a single day object:
         {
           "day": ${day.day},
-          "activities": [ ... (same structure as before with imageQuery) ]
+          "theme": "New Theme",
+          "activities": [ ... (same structure as before with cost, travelTime, travelCost, imageQuery) ]
         }
     `;
 

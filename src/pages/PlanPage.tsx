@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PlannerInput } from '../components/planner/PlannerInput';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
-import { Sparkles, AlertCircle, Plane } from 'lucide-react';
+import { Sparkles, AlertCircle, Plane, Save } from 'lucide-react';
 import { generateItinerary, regenerateDay } from '../services/ai';
 import { searchFlights } from '../services/amadeus';
 import { Button } from '../components/common/Button';
+import { supabase, saveItinerary } from '../services/supabase';
+import { useNavigate } from 'react-router-dom';
 
 const PlanPage = () => {
     const [planData, setPlanData] = useState<any>(null);
@@ -13,6 +15,17 @@ const PlanPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [flightStatus, setFlightStatus] = useState<string>('');
+    const [saving, setSaving] = useState(false);
+    const [user, setUser] = useState<any>(null);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        getUser();
+    }, []);
 
     const handlePlan = async (data: any) => {
         setLoading(true);
@@ -20,15 +33,19 @@ const PlanPage = () => {
         setFlightStatus('Searching for flights...');
 
         try {
-            // 1. Search for flights
-            const today = new Date().toISOString().split('T')[0];
+            // 1. Search for flights (only if origin is provided)
             let flightData = null;
-            try {
-                flightData = await searchFlights(data.origin, data.destination, today);
-                setFlightStatus('Flights found! Generating itinerary...');
-            } catch (flightError) {
-                console.warn('Flight search failed, proceeding with itinerary only:', flightError);
-                setFlightStatus('Flight search unavailable. Generating itinerary...');
+            if (data.origin) {
+                const today = new Date().toISOString().split('T')[0];
+                try {
+                    flightData = await searchFlights(data.origin, data.destination, today);
+                    setFlightStatus('Flights found! Generating itinerary...');
+                } catch (flightError) {
+                    console.warn('Flight search failed, proceeding with itinerary only:', flightError);
+                    setFlightStatus('Flight search unavailable. Generating itinerary...');
+                }
+            } else {
+                setFlightStatus('Generating itinerary...');
             }
 
             // 2. Generate Itinerary (passing flight info context if available)
@@ -56,10 +73,6 @@ const PlanPage = () => {
     const handleRegenerateDay = async (dayIndex: number) => {
         if (!planData) return;
 
-        // Optimistic UI update or loading state could go here
-        // For now, let's just show a loading toast or similar if we had one.
-        // We'll use a simple alert or just rely on the UI updating eventually.
-        // Better: Set a local loading state for that day if possible, but for now global loading is safer.
         setLoading(true);
 
         try {
@@ -75,6 +88,26 @@ const PlanPage = () => {
             alert('Failed to regenerate day. Please try again.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSaveTrip = async () => {
+        if (!user) {
+            alert('Please login to save your trip!');
+            navigate('/login');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await saveItinerary(planData, user.id);
+            alert('Trip saved successfully!');
+            navigate('/saved');
+        } catch (err) {
+            console.error('Error saving trip:', err);
+            alert('Failed to save trip. Please try again.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -115,6 +148,12 @@ const PlanPage = () => {
     if (planData) {
         return (
             <div className="container mx-auto px-6 max-w-7xl py-12 bg-[var(--color-background)]">
+                <div className="flex justify-end mb-4">
+                    <Button onClick={handleSaveTrip} disabled={saving}>
+                        <Save className="w-4 h-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Trip'}
+                    </Button>
+                </div>
                 <ItineraryView
                     destination={planData.destination}
                     days={itinerary}
