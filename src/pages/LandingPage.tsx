@@ -10,7 +10,8 @@ import {
     Target,
     Zap,
     Scale,
-    Map as MapIcon
+    Map as MapIcon,
+    ArrowDown
 } from 'lucide-react';
 
 const LandingPage = () => {
@@ -32,8 +33,69 @@ const LandingPage = () => {
     return (
         <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-text)] font-sans selection:bg-[var(--color-primary)] selection:text-white">
 
-            {/* Hero Section */}
-            <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+            {/* Navigation Shell */}
+            <nav className="fixed top-0 left-0 right-0 z-50 border-b border-stone-200 bg-[var(--color-background)]/80 backdrop-blur-md">
+                <div className="container mx-auto flex h-16 items-center justify-between px-6 max-w-7xl">
+                    {/* Logo */}
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
+                            <Sparkles size={16} fill="currentColor" />
+                        </div>
+                        <span className="text-xl font-bold tracking-tight text-stone-900 font-serif">Plannily</span>
+                    </div>
+
+                    {/* Desktop Nav */}
+                    <div className="hidden md:flex items-center gap-8">
+                        <button onClick={() => navigate('/discover')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
+                            Discover
+                        </button>
+                        <button onClick={() => navigate('/plan')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
+                            Plan
+                        </button>
+                        <button onClick={() => navigate('/saved')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
+                            Saved Trips
+                        </button>
+                        <button
+                            onClick={() => navigate('/plan')}
+                            className="rounded-full bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary)]/90 transition-colors"
+                        >
+                            Start planning
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            {/* 3D Hero Section */}
+            <section className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-stone-50 pt-16">
+                {/* Background Title */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none">
+                    <h1 className="text-[15vw] font-black text-stone-200/50 tracking-tighter leading-none text-center">
+                        TAKE<br />FLIGHT
+                    </h1>
+                </div>
+
+                {/* 3D Model Container */}
+                <div className="relative z-10 w-full h-full max-w-7xl mx-auto flex items-center justify-center">
+                    <div className="w-full h-[80vh] md:h-full">
+                        <iframe
+                            title="McDonnell Douglas DC-10"
+                            className="w-full h-full"
+                            frameBorder="0"
+                            allowFullScreen
+                            allow="autoplay; fullscreen; xr-spatial-tracking"
+                            src="https://sketchfab.com/models/dea7bbf2875c4f38afd4970f61763820/embed?preload=1&transparent=1&ui_animations=0&ui_infos=0&ui_stop=0&ui_inspector=0&ui_watermark=0&ui_ar=0&ui_help=0&ui_settings=0&ui_vr=0&ui_fullscreen=0&ui_annotations=0"
+                        />
+                    </div>
+                </div>
+
+                {/* Scroll Indicator */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 animate-bounce text-stone-400">
+                    <ArrowDown size={32} />
+                </div>
+            </section>
+
+            {/* Features / Intro Section (Previously Hero) */}
+            <section className="relative py-20 lg:py-32 overflow-hidden">
                 {/* Background Gradient Blob */}
                 <div className="absolute top-0 right-0 -z-10 h-[600px] w-[600px] translate-x-1/3 -translate-y-1/4 rounded-full bg-[var(--color-primary)]/5 blur-3xl" />
 
