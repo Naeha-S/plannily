@@ -3,7 +3,7 @@ import { PlannerInput } from '../components/planner/PlannerInput';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
 import { Sparkles, AlertCircle, Plane, Save } from 'lucide-react';
-import { generateItinerary, regenerateDay } from '../services/ai';
+import { generateItinerary, regenerateDay, generateMoreEvents } from '../services/ai';
 import { searchFlights } from '../services/amadeus';
 import { Button } from '../components/common/Button';
 import { supabase, saveItinerary, getProfile } from '../services/supabase';
@@ -53,7 +53,8 @@ const PlanPage = () => {
                 travelers: preferences.companions,
                 interests: [...preferences.vibes, ...preferences.interests],
                 travelStyle: preferences.travelStyle,
-                origin: '' // Optional, not collected in Discover
+                origin: '', // Optional, not collected in Discover
+                days: preferences.duration
             };
 
             handlePlan(planRequest);
@@ -125,6 +126,49 @@ const PlanPage = () => {
         }
     };
 
+    const handleLoadMoreEvents = async () => {
+        if (!planData) return;
+        setLoading(true);
+        try {
+            // Use the first day's date or a default
+            const date = planData.days[0]?.date || new Date().toISOString().split('T')[0];
+            const newEvents = await generateMoreEvents(planData.destination, date);
+
+            setPlanData((prev: any) => ({
+                ...prev,
+                events: [...(prev.events || []), ...newEvents]
+            }));
+        } catch (err) {
+            console.error('Failed to load more events', err);
+            alert('Failed to load more events.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAddEvent = (event: any, dayIndex: number) => {
+        const newDays = [...itinerary];
+        const day = newDays[dayIndex];
+
+        // Create a new activity from the event
+        const newActivity = {
+            id: `evt-${Date.now()}`,
+            name: event.name,
+            type: event.type,
+            startTime: '18:00', // Default time
+            endTime: '20:00',
+            description: event.description,
+            location: event.location,
+            cost: 0,
+            imageUrl: event.imageUrl
+        };
+
+        day.activities.push(newActivity);
+        setItinerary(newDays);
+        setPlanData({ ...planData, days: newDays });
+        alert(`Added ${event.name} to Day ${day.day}`);
+    };
+
     const handleSaveTrip = async () => {
         if (!user) {
             alert('Please login to save your trip!');
@@ -194,6 +238,8 @@ const PlanPage = () => {
                     events={planData.events}
                     onEdit={() => console.log('Edit')}
                     onRegenerateDay={handleRegenerateDay}
+                    onLoadMoreEvents={handleLoadMoreEvents}
+                    onAddEvent={handleAddEvent}
                 />
             </div>
         );

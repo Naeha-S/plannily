@@ -74,15 +74,15 @@ function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
                     modelRef.current.rotation.z = 0; // Keep straight
                 } else {
                     // Desktop: Top Right -> Bottom Left trajectory
-                    // Flip 180 from previous (-0.8 PI) -> 0.2 PI
-                    const baseYaw = Math.PI * 0.2;
-                    const basePitch = 0.5; // Show Top
-                    const baseRoll = 0.2; // Slight Bank
+                    // Align nose with descent path
+                    const baseYaw = Math.PI * 0.35; // Face more Left
+                    const basePitch = -0.2; // Nose Down (Match descent & Show Top)
+                    const baseRoll = 0.5; // Bank to show top
 
                     modelRef.current.rotation.x = basePitch;
-                    // Turn Left as it exits (increase Yaw?)
+                    // Turn Left as it exits
                     modelRef.current.rotation.y = baseYaw + (exitProgress * 0.5);
-                    // Bank Left (decrease Roll to negative?)
+                    // Bank Left
                     modelRef.current.rotation.z = baseRoll - (exitProgress * 0.5);
                 }
             }
@@ -90,9 +90,9 @@ function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
             // Initial static rotation (before scroll)
             if (modelRef.current && !isMobile) {
                 // Align with Top-Right -> Center path
-                modelRef.current.rotation.x = 0.5; // Show Top
-                modelRef.current.rotation.y = Math.PI * 0.2; // Face Nose-First (Flipped)
-                modelRef.current.rotation.z = 0.2; // Slight Bank
+                modelRef.current.rotation.x = -0.2; // Nose Down
+                modelRef.current.rotation.y = Math.PI * 0.35; // Face Left
+                modelRef.current.rotation.z = 0.5; // Bank
             }
         }
 

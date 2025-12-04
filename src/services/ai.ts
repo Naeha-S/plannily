@@ -72,6 +72,7 @@ export const generateDestinations = async (preferences: any) => {
     Companions: ${preferences.companions}
     Budget: ${preferences.budget}
     Duration: ${preferences.duration} days
+    Origin: ${preferences.origin}
 
     Return strictly valid JSON (no markdown):
     {
@@ -240,6 +241,43 @@ export const regenerateDay = async (currentItinerary: any, dayIndex: number) => 
     return newDay;
   } catch (error) {
     console.error('Error regenerating day:', error);
+    throw error;
+  }
+};
+
+export const generateMoreEvents = async (destination: string, date: string) => {
+  const prompt = `
+      Find 4 unique special events, concerts, or festivals in ${destination} around ${date}.
+      Focus on unique, local, or high-profile events.
+      
+      Return strictly valid JSON:
+      [
+        {
+          "id": "unique_id",
+          "name": "Event Name",
+          "date": "YYYY-MM-DD",
+          "description": "Short description",
+          "location": "Venue",
+          "type": "concert|festival|exhibition|other",
+          "imageQuery": "Search term"
+        }
+      ]
+    `;
+
+  try {
+    const text = await generateWithFallback(prompt);
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const events = JSON.parse(cleanText);
+
+    // Hydrate with images
+    const eventsWithImages = await Promise.all(events.map(async (evt: any) => ({
+      ...evt,
+      imageUrl: await getUnsplashImage(evt.imageQuery || evt.name + ' ' + destination)
+    })));
+
+    return eventsWithImages;
+  } catch (error) {
+    console.error('Error generating more events:', error);
     throw error;
   }
 };

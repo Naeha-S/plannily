@@ -13,6 +13,7 @@ interface DiscoveryData {
     startDate: string;
     endDate: string;
     duration: number;
+    isMulticity: boolean;
 }
 
 const VIBES = [
@@ -66,6 +67,7 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
         startDate: '',
         endDate: '',
         duration: 0,
+        isMulticity: false,
     });
 
     // Calculate duration whenever dates change
@@ -238,6 +240,21 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
                                         className="w-full p-3 pl-12 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="flex items-center space-x-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.isMulticity}
+                                        onChange={(e) => setData({ ...data, isMulticity: e.target.checked })}
+                                        className="w-5 h-5 text-primary rounded focus:ring-primary"
+                                    />
+                                    <div>
+                                        <span className="font-medium text-slate-700">I want a Multi-city Trip</span>
+                                        <p className="text-xs text-slate-500">We'll suggest a route covering multiple destinations.</p>
+                                    </div>
+                                </label>
                             </div>
 
                             <div className="grid md:grid-cols-2 gap-6 mb-8">

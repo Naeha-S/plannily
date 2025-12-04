@@ -10,9 +10,11 @@ interface ItineraryViewProps {
     events?: TripEvent[];
     onEdit: () => void;
     onRegenerateDay?: (dayIndex: number) => void;
+    onLoadMoreEvents?: () => void;
+    onAddEvent?: (event: TripEvent, dayIndex: number) => void;
 }
 
-export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateDay }: ItineraryViewProps) => {
+export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateDay, onLoadMoreEvents, onAddEvent }: ItineraryViewProps) => {
     const [selectedDay, setSelectedDay] = useState(0);
 
     return (
@@ -48,17 +50,16 @@ export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateD
                         <div className="space-y-4">
                             {events.map((evt) => (
                                 <div key={evt.id} className="group cursor-pointer">
-                                    <div className="aspect-video rounded-lg overflow-hidden mb-2 relative">
-                                        <img src={evt.imageUrl} alt={evt.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                                        <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
-                                            {evt.type}
-                                        </div>
-                                    </div>
                                     <h4 className="font-bold text-stone-900 text-sm leading-tight">{evt.name}</h4>
                                     <p className="text-xs text-stone-500 mt-1">{evt.date} • {evt.location}</p>
                                 </div>
                             ))}
                         </div>
+                        {onLoadMoreEvents && (
+                            <Button variant="outline" size="sm" className="w-full mt-4" onClick={onLoadMoreEvents}>
+                                Load More Events
+                            </Button>
+                        )}
                     </div>
                 )}
             </div>

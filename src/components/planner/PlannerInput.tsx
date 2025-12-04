@@ -15,7 +15,8 @@ export const PlannerInput = ({ onPlan }: PlannerInputProps) => {
         travelers: 2,
         budget: 'medium',
         interests: [] as string[],
-        pace: 'balanced'
+        pace: 'balanced',
+        isMulticity: false
     });
 
     const handleNext = (e: React.FormEvent) => {
@@ -75,6 +76,21 @@ export const PlannerInput = ({ onPlan }: PlannerInputProps) => {
                                         required
                                     />
                                 </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="flex items-center space-x-3 p-3 border border-stone-200 rounded-xl cursor-pointer hover:bg-stone-50 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.isMulticity}
+                                        onChange={(e) => setFormData({ ...formData, isMulticity: e.target.checked })}
+                                        className="w-5 h-5 text-[var(--color-primary)] rounded focus:ring-[var(--color-primary)]"
+                                    />
+                                    <div>
+                                        <span className="font-medium text-stone-700">Multi-city Trip</span>
+                                        <p className="text-xs text-stone-500">Plan a route with multiple stops.</p>
+                                    </div>
+                                </label>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

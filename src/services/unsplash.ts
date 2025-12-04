@@ -6,7 +6,7 @@ const BASE_URL = 'https://api.unsplash.com';
 export const getUnsplashImage = async (query: string): Promise<string> => {
     // 1. Check Cache
     try {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('place_images')
             .select('image_url')
             .eq('place_name', query.toLowerCase())
