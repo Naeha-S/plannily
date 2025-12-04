@@ -23,6 +23,9 @@ const LoginPage = () => {
             });
 
             if (error) throw error;
+
+            // Check if profile exists, if not redirect to profile page to complete it
+            // For now, let's just default to /plan, but maybe /profile is better for first timers
             navigate('/plan');
         } catch (err: any) {
             setError(err.message);

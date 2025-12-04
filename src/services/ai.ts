@@ -110,8 +110,22 @@ export const generateDestinations = async (preferences: any) => {
 };
 
 export const generateItinerary = async (request: any) => {
+  const profileContext = request.userProfile ? `
+    User Profile:
+    - Origin: ${request.userProfile.country_of_origin || 'Unknown'}
+    - Currency Preference: ${request.userProfile.currency || 'USD'}
+    - Language: ${request.userProfile.language || 'en'}
+    - Interests: ${request.userProfile.travel_preferences?.interests?.join(', ') || 'General'}
+    - Visas: ${request.userProfile.visas?.join(', ') || 'None'}
+    - Citizenships: ${request.userProfile.citizenships?.join(', ') || 'None'}
+    
+    IMPORTANT: Consider visa requirements if applicable. Quote costs in ${request.userProfile.currency || 'USD'}.
+  ` : '';
+
   const prompt = `
     Act as a luxury travel planner. Create a detailed ${request.days}-day itinerary for ${request.travelers} people to ${request.destination}.
+    
+    ${profileContext}
     
     Preferences:
     - Budget: ${request.budget}
@@ -156,9 +170,9 @@ export const generateItinerary = async (request: any) => {
               "endTime": "HH:MM",
               "description": "Engaging description. Mention why it fits the user.",
               "location": "Address or Area",
-              "cost": number (per person estimate in USD),
+              "cost": number (per person estimate in ${request.userProfile?.currency || 'USD'}),
               "travelTime": "e.g. 15 mins walk from previous",
-              "travelCost": number (estimate in USD),
+              "travelCost": number (estimate in ${request.userProfile?.currency || 'USD'}),
               "imageQuery": "Search term"
             }
           ]

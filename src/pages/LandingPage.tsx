@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 import {
     Compass,
     MapPin,
@@ -13,41 +15,22 @@ import {
 
 const LandingPage = () => {
     const navigate = useNavigate();
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    }, []);
+
+    const handleAction = (path: string) => {
+        if (!user) {
+            navigate('/login');
+        } else {
+            navigate(path);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-text)] font-sans selection:bg-[var(--color-primary)] selection:text-white">
-
-            {/* Navigation Shell */}
-            <nav className="fixed top-0 left-0 right-0 z-50 border-b border-stone-200 bg-[var(--color-background)]/80 backdrop-blur-md">
-                <div className="container mx-auto flex h-16 items-center justify-between px-6 max-w-7xl">
-                    {/* Logo */}
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
-                            <Sparkles size={16} fill="currentColor" />
-                        </div>
-                        <span className="text-xl font-bold tracking-tight text-stone-900 font-serif">Plannily</span>
-                    </div>
-
-                    {/* Desktop Nav */}
-                    <div className="hidden md:flex items-center gap-8">
-                        <button onClick={() => navigate('/discover')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Discover
-                        </button>
-                        <button onClick={() => navigate('/plan')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Plan
-                        </button>
-                        <button onClick={() => navigate('/saved')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Saved Trips
-                        </button>
-                        <button
-                            onClick={() => navigate('/plan')}
-                            className="rounded-full bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary)]/90 transition-colors"
-                        >
-                            Start planning
-                        </button>
-                    </div>
-                </div>
-            </nav>
 
             {/* Hero Section */}
             <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
@@ -77,7 +60,7 @@ const LandingPage = () => {
                                 {/* Discovery Card */}
                                 <motion.div
                                     whileHover={{ y: -4 }}
-                                    onClick={() => navigate('/discover')}
+                                    onClick={() => handleAction('/discover')}
                                     className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
                                 >
                                     <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
@@ -97,7 +80,7 @@ const LandingPage = () => {
                                 {/* Planning Card */}
                                 <motion.div
                                     whileHover={{ y: -4 }}
-                                    onClick={() => navigate('/plan')}
+                                    onClick={() => handleAction('/plan')}
                                     className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
                                 >
                                     <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">

@@ -6,7 +6,7 @@ import { Sparkles, AlertCircle, Plane, Save } from 'lucide-react';
 import { generateItinerary, regenerateDay } from '../services/ai';
 import { searchFlights } from '../services/amadeus';
 import { Button } from '../components/common/Button';
-import { supabase, saveItinerary } from '../services/supabase';
+import { supabase, saveItinerary, getProfile } from '../services/supabase';
 import { useNavigate } from 'react-router-dom';
 
 const PlanPage = () => {
@@ -17,12 +17,21 @@ const PlanPage = () => {
     const [flightStatus, setFlightStatus] = useState<string>('');
     const [saving, setSaving] = useState(false);
     const [user, setUser] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
+            if (user) {
+                try {
+                    const profileData = await getProfile(user.id);
+                    setProfile(profileData);
+                } catch (err) {
+                    console.error('Error fetching profile', err);
+                }
+            }
         };
         getUser();
     }, []);
@@ -51,7 +60,8 @@ const PlanPage = () => {
             // 2. Generate Itinerary (passing flight info context if available)
             const aiRequest = {
                 ...data,
-                flightContext: flightData ? JSON.stringify(flightData.data?.slice(0, 3)) : 'No flight data available'
+                flightContext: flightData ? JSON.stringify(flightData.data?.slice(0, 3)) : 'No flight data available',
+                userProfile: profile // Pass profile data to AI
             };
 
             const result = await generateItinerary(aiRequest);

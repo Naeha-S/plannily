@@ -5,6 +5,7 @@ import DiscoverPage from './pages/DiscoverPage';
 import PlanPage from './pages/PlanPage';
 import SavedTripsPage from './pages/SavedTripsPage';
 import LoginPage from './pages/LoginPage';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="discover" element={<DiscoverPage />} />
           <Route path="plan" element={<PlanPage />} />
           <Route path="saved" element={<SavedTripsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="login" element={<LoginPage />} />
         </Route>
       </Routes>
