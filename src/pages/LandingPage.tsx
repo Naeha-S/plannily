@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../services/supabase';
+import { Canvas } from '@react-three/fiber';
+import { useGLTF, OrbitControls, Stage } from '@react-three/drei';
 import {
     Compass,
     MapPin,
@@ -13,6 +15,11 @@ import {
     Map as MapIcon,
     ArrowDown
 } from 'lucide-react';
+
+function Model(props: any) {
+    const { scene } = useGLTF('/models/plane.glb');
+    return <primitive object={scene} {...props} />;
+}
 
 const LandingPage = () => {
     const navigate = useNavigate();
@@ -77,14 +84,14 @@ const LandingPage = () => {
                 {/* 3D Model Container */}
                 <div className="relative z-10 w-full h-full max-w-7xl mx-auto flex items-center justify-center">
                     <div className="w-full h-[80vh] md:h-full">
-                        <iframe
-                            title="McDonnell Douglas DC-10"
-                            className="w-full h-full"
-                            frameBorder="0"
-                            allowFullScreen
-                            allow="autoplay; fullscreen; xr-spatial-tracking"
-                            src="https://sketchfab.com/models/dea7bbf2875c4f38afd4970f61763820/embed?preload=1&transparent=1&ui_animations=0&ui_infos=0&ui_stop=0&ui_inspector=0&ui_watermark=0&ui_ar=0&ui_help=0&ui_settings=0&ui_vr=0&ui_fullscreen=0&ui_annotations=0"
-                        />
+                        <Canvas dpr={[1, 2]} camera={{ fov: 45 }} style={{ position: 'absolute' }}>
+                            <Suspense fallback={null}>
+                                <Stage environment="city" intensity={0.6}>
+                                    <Model />
+                                </Stage>
+                            </Suspense>
+                            <OrbitControls enableZoom={false} autoRotate />
+                        </Canvas>
                     </div>
                 </div>
 
