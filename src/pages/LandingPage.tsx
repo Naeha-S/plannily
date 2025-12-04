@@ -48,9 +48,9 @@ function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
             exitPos = new THREE.Vector3(0, 5, -5); // Fly up and away
         } else {
             // Desktop: Top Right -> Center -> Bottom Left
-            startPos = new THREE.Vector3(6, 6, 0); // Top Right
-            centerPos = new THREE.Vector3(0, -1, 0); // Slightly lower center
-            exitPos = new THREE.Vector3(-10, -10, 5); // Bottom Left and closer
+            startPos = new THREE.Vector3(8, 6, 0); // Top Right
+            centerPos = new THREE.Vector3(0, -1, 0); // Center
+            exitPos = new THREE.Vector3(-8, -10, 2); // Bottom Left exit
         }
 
         // Interpolate entrance
@@ -73,12 +73,26 @@ function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
                     modelRef.current.rotation.x = -exitProgress * 0.8;
                     modelRef.current.rotation.z = 0; // Keep straight
                 } else {
-                    // Desktop bank/turn
-                    // Bank left as it turns left
-                    modelRef.current.rotation.z = exitProgress * 0.5;
-                    modelRef.current.rotation.y = -exitProgress * 0.5;
-                    modelRef.current.rotation.x = exitProgress * 0.2;
+                    // Desktop: Top Right -> Bottom Left trajectory
+                    // Flip 180 from previous (-0.8 PI) -> 0.2 PI
+                    const baseYaw = Math.PI * 0.2;
+                    const basePitch = 0.5; // Show Top
+                    const baseRoll = 0.2; // Slight Bank
+
+                    modelRef.current.rotation.x = basePitch;
+                    // Turn Left as it exits (increase Yaw?)
+                    modelRef.current.rotation.y = baseYaw + (exitProgress * 0.5);
+                    // Bank Left (decrease Roll to negative?)
+                    modelRef.current.rotation.z = baseRoll - (exitProgress * 0.5);
                 }
+            }
+        } else {
+            // Initial static rotation (before scroll)
+            if (modelRef.current && !isMobile) {
+                // Align with Top-Right -> Center path
+                modelRef.current.rotation.x = 0.5; // Show Top
+                modelRef.current.rotation.y = Math.PI * 0.2; // Face Nose-First (Flipped)
+                modelRef.current.rotation.z = 0.2; // Slight Bank
             }
         }
 
@@ -88,7 +102,7 @@ function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
     return <primitive
         ref={modelRef}
         object={scene}
-        scale={isMobile ? 0.12 : 0.35} // Bigger on desktop
+        scale={isMobile ? 0.12 : 0.3} // Scale 0.3
     />;
 }
 
@@ -152,9 +166,7 @@ const LandingPage = () => {
                 <div className="container mx-auto flex h-16 items-center justify-between px-6 max-w-7xl">
                     {/* Logo */}
                     <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
-                            <Sparkles size={16} fill="currentColor" />
-                        </div>
+                        <img src="/plannily_logo.png" alt="Plannily Logo" className="h-8 w-8 object-contain" />
                         <span className="text-xl font-bold tracking-tight text-stone-900 font-serif">Plannily</span>
                     </div>
 

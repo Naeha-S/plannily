@@ -85,7 +85,7 @@ export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateD
                         </div>
                     </div>
 
-                    <div className="space-y-8 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-stone-100">
+                    <div className="space-y-8 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-stone-100 before:z-0">
                         <AnimatePresence mode="wait">
                             {days[selectedDay]?.activities.map((activity, index) => (
                                 <div key={activity.id}>
@@ -93,7 +93,7 @@ export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateD
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: index * 0.1 }}
-                                        className="relative pl-12"
+                                        className="relative pl-12 z-10"
                                     >
                                         {/* Timeline Dot */}
                                         <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-white border-2 border-[var(--color-primary)] flex items-center justify-center z-10">
@@ -154,9 +154,9 @@ export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateD
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             transition={{ delay: index * 0.1 + 0.05 }}
-                                            className="pl-12 py-4 flex items-center gap-3 text-sm text-stone-400"
+                                            className="pl-12 py-4 flex items-center gap-3 text-sm text-stone-400 relative"
                                         >
-                                            <div className="w-0.5 h-full bg-stone-200 absolute left-4" />
+                                            <div className="w-0.5 h-full bg-stone-200 absolute left-4 top-0" />
                                             <Navigation size={14} />
                                             <span>{activity.travelTime}</span>
                                             {activity.travelCost && (

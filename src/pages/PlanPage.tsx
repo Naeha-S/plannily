@@ -7,7 +7,7 @@ import { generateItinerary, regenerateDay } from '../services/ai';
 import { searchFlights } from '../services/amadeus';
 import { Button } from '../components/common/Button';
 import { supabase, saveItinerary, getProfile } from '../services/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const PlanPage = () => {
     const [planData, setPlanData] = useState<any>(null);
@@ -19,6 +19,8 @@ const PlanPage = () => {
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const navigate = useNavigate();
+    const location = useLocation();
+    const [hasAutoPlanned, setHasAutoPlanned] = useState(false);
 
     useEffect(() => {
         const getUser = async () => {
@@ -35,6 +37,28 @@ const PlanPage = () => {
         };
         getUser();
     }, []);
+
+    // Handle auto-planning from Discover page
+    useEffect(() => {
+        if (location.state && location.state.destination && location.state.preferences && !hasAutoPlanned) {
+            const { destination, preferences } = location.state;
+            setHasAutoPlanned(true);
+
+            // Construct plan request from discovery data
+            const planRequest = {
+                destination: destination,
+                startDate: preferences.startDate,
+                endDate: preferences.endDate,
+                budget: preferences.budget,
+                travelers: preferences.companions,
+                interests: [...preferences.vibes, ...preferences.interests],
+                travelStyle: preferences.travelStyle,
+                origin: '' // Optional, not collected in Discover
+            };
+
+            handlePlan(planRequest);
+        }
+    }, [location.state, hasAutoPlanned]);
 
     const handlePlan = async (data: any) => {
         setLoading(true);

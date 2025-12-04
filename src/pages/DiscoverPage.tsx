@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DiscoveryWizard } from '../components/discovery/DiscoveryWizard';
 import { DestinationCard } from '../components/discovery/DestinationCard';
 import type { Destination } from '../types';
@@ -7,14 +8,17 @@ import { Button } from '../components/common/Button';
 import { generateDestinations } from '../services/ai';
 
 const DiscoverPage = () => {
+    const navigate = useNavigate();
     const [showResults, setShowResults] = useState(false);
     const [loading, setLoading] = useState(false);
     const [destinations, setDestinations] = useState<Destination[]>([]);
     const [error, setError] = useState('');
+    const [discoveryData, setDiscoveryData] = useState<any>(null);
 
     const handleDiscoveryComplete = async (data: any) => {
         setLoading(true);
         setError('');
+        setDiscoveryData(data);
         try {
             const result = await generateDestinations(data);
             if (result && result.destinations) {
@@ -35,6 +39,20 @@ const DiscoverPage = () => {
         setShowResults(false);
         setDestinations([]);
         setError('');
+        setDiscoveryData(null);
+    };
+
+    const handleSelectDestination = (id: string) => {
+        const selectedDest = destinations.find(d => d.id === id);
+        if (selectedDest && discoveryData) {
+            navigate('/plan', {
+                state: {
+                    destination: selectedDest.name,
+                    preferences: discoveryData,
+                    preSelectedDestination: selectedDest // Pass full object if needed
+                }
+            });
+        }
     };
 
     if (loading) {
@@ -84,7 +102,7 @@ const DiscoverPage = () => {
                             key={dest.id}
                             destination={dest}
                             rank={index + 1}
-                            onSelect={(id) => console.log('Selected', id)}
+                            onSelect={handleSelectDestination}
                         />
                     ))}
                 </div>
@@ -97,7 +115,7 @@ const DiscoverPage = () => {
             <div className="text-center mb-16">
                 <h1 className="text-[var(--text-h1)] font-bold text-[var(--color-text)] mb-6 font-serif">Let's find your next trip</h1>
                 <p className="text-[var(--text-h3)] text-stone-600 max-w-2xl mx-auto font-light leading-relaxed">
-                    Answer 3 quick questions and our AI will match you with the perfect destinations.
+                    Answer a few quick questions and our AI will match you with the perfect destinations.
                 </p>
             </div>
 
