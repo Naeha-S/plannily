@@ -49,7 +49,21 @@ export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateD
                         </div>
                         <div className="space-y-4">
                             {events.map((evt) => (
-                                <div key={evt.id} className="group cursor-pointer">
+                                <div key={evt.id} className="group cursor-pointer relative">
+                                    <div className="aspect-video rounded-lg overflow-hidden mb-2 relative">
+                                        <img src={evt.imageUrl} alt={evt.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                        <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+                                            {evt.type}
+                                        </div>
+                                        {onAddEvent && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onAddEvent(evt, selectedDay); }}
+                                                className="absolute bottom-2 right-2 bg-white text-[var(--color-primary)] text-xs px-2 py-1 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity font-medium hover:bg-stone-50"
+                                            >
+                                                + Add
+                                            </button>
+                                        )}
+                                    </div>
                                     <h4 className="font-bold text-stone-900 text-sm leading-tight">{evt.name}</h4>
                                     <p className="text-xs text-stone-500 mt-1">{evt.date} • {evt.location}</p>
                                 </div>

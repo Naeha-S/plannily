@@ -26,11 +26,9 @@ function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
 
     useFrame((state) => {
         if (!modelRef.current) return;
-
         const currentScroll = scrollY.current;
         const viewportHeight = window.innerHeight;
         const scrollProgress = Math.min(currentScroll / viewportHeight, 1); // 0 to 1 over the first screen height
-
         // Animation Logic
         // Time-based entrance:
         const time = state.clock.getElapsedTime();
