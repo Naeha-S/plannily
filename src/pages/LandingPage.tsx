@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { supabase } from '../services/supabase';
-import { Canvas } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Stage } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
+import * as THREE from 'three';
 import {
     Compass,
     MapPin,
@@ -16,14 +17,115 @@ import {
     ArrowDown
 } from 'lucide-react';
 
-function Model(props: any) {
+// Preload the model for faster subsequent loads
+useGLTF.preload('/models/plane.glb');
+
+function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>, isMobile: boolean }) {
     const { scene } = useGLTF('/models/plane.glb');
-    return <primitive object={scene} {...props} />;
+    const modelRef = useRef<THREE.Group>(null);
+
+    useFrame((state) => {
+        if (!modelRef.current) return;
+
+        const currentScroll = scrollY.current;
+        const viewportHeight = window.innerHeight;
+        const scrollProgress = Math.min(currentScroll / viewportHeight, 1); // 0 to 1 over the first screen height
+
+        // Animation Logic
+        // Time-based entrance:
+        const time = state.clock.getElapsedTime();
+        const entranceDuration = 3.0; // Slower entrance
+        const entranceProgress = Math.min(time / entranceDuration, 1);
+        // Ease out cubic
+        const easeOut = 1 - Math.pow(1 - entranceProgress, 3);
+
+        let startPos, centerPos, exitPos;
+
+        if (isMobile) {
+            // Mobile: Top Center -> Center -> Takeoff (Up & Forward)
+            startPos = new THREE.Vector3(0, 4, 0);
+            centerPos = new THREE.Vector3(0, -0.5, 0);
+            exitPos = new THREE.Vector3(0, 5, -5); // Fly up and away
+        } else {
+            // Desktop: Top Right -> Center -> Bottom Left
+            startPos = new THREE.Vector3(6, 6, 0); // Top Right
+            centerPos = new THREE.Vector3(0, -1, 0); // Slightly lower center
+            exitPos = new THREE.Vector3(-10, -10, 5); // Bottom Left and closer
+        }
+
+        // Interpolate entrance
+        const currentPos = new THREE.Vector3().lerpVectors(startPos, centerPos, easeOut);
+
+        // Scroll-based Exit
+        if (scrollProgress > 0) {
+            let exitProgress = 0;
+            // Delay exit slightly
+            if (scrollProgress > 0.1) {
+                exitProgress = (scrollProgress - 0.1) / 0.9;
+            }
+
+            currentPos.lerp(exitPos, exitProgress);
+
+            // Rotation Logic
+            if (modelRef.current) {
+                if (isMobile) {
+                    // Takeoff pitch (nose up)
+                    modelRef.current.rotation.x = -exitProgress * 0.8;
+                    modelRef.current.rotation.z = 0; // Keep straight
+                } else {
+                    // Desktop bank/turn
+                    // Bank left as it turns left
+                    modelRef.current.rotation.z = exitProgress * 0.5;
+                    modelRef.current.rotation.y = -exitProgress * 0.5;
+                    modelRef.current.rotation.x = exitProgress * 0.2;
+                }
+            }
+        }
+
+        modelRef.current.position.copy(currentPos);
+    });
+
+    return <primitive
+        ref={modelRef}
+        object={scene}
+        scale={isMobile ? 0.12 : 0.35} // Bigger on desktop
+    />;
+}
+
+// Scene component to handle lighting and environment
+function Scene({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>, isMobile: boolean }) {
+    return (
+        <>
+            <ambientLight intensity={1} />
+            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
+            <Environment preset="city" />
+            <Model scrollY={scrollY} isMobile={isMobile} />
+        </>
+    );
 }
 
 const LandingPage = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState<any>(null);
+    const scrollY = useRef(0);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Track scroll position
+    useEffect(() => {
+        const handleScroll = () => {
+            scrollY.current = window.scrollY;
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Track mobile state
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile(); // Initial check
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -35,6 +137,11 @@ const LandingPage = () => {
         } else {
             navigate(path);
         }
+    };
+
+    const scrollToContent = () => {
+        const featuresSection = document.getElementById('features-section');
+        featuresSection?.scrollIntoView({ behavior: 'smooth' });
     };
 
     return (
@@ -72,37 +179,33 @@ const LandingPage = () => {
                 </div>
             </nav>
 
-            {/* 3D Hero Section */}
-            <section className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-stone-50 pt-16">
+            {/* 3D Canvas Background (Fixed) */}
+            <div className="fixed inset-0 z-10 pointer-events-none">
+                <Canvas dpr={[1, 2]} camera={{ fov: 45, position: [0, 0, 10] }} style={{ pointerEvents: 'auto' }}>
+                    <Suspense fallback={null}>
+                        <Scene scrollY={scrollY} isMobile={isMobile} />
+                    </Suspense>
+                    <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
+                </Canvas>
+            </div>
+
+            {/* Hero Section Content */}
+            <section className="relative h-screen w-full flex items-center justify-center overflow-hidden pt-16 z-0">
                 {/* Background Title */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
                     <h1 className="text-[15vw] font-black text-stone-200/50 tracking-tighter leading-none text-center">
                         TAKE<br />FLIGHT
                     </h1>
                 </div>
 
-                {/* 3D Model Container */}
-                <div className="relative z-10 w-full h-full max-w-7xl mx-auto flex items-center justify-center">
-                    <div className="w-full h-[80vh] md:h-full">
-                        <Canvas dpr={[1, 2]} camera={{ fov: 45 }} style={{ position: 'absolute' }}>
-                            <Suspense fallback={null}>
-                                <Stage environment="city" intensity={0.6}>
-                                    <Model />
-                                </Stage>
-                            </Suspense>
-                            <OrbitControls enableZoom={false} autoRotate />
-                        </Canvas>
-                    </div>
-                </div>
-
                 {/* Scroll Indicator */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 animate-bounce text-stone-400">
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 animate-bounce text-stone-400 cursor-pointer" onClick={scrollToContent}>
                     <ArrowDown size={32} />
                 </div>
             </section>
 
             {/* Features / Intro Section (Previously Hero) */}
-            <section className="relative py-20 lg:py-32 overflow-hidden">
+            <section id="features-section" className="relative py-20 lg:py-32 overflow-hidden bg-stone-50/80 backdrop-blur-sm z-20">
                 {/* Background Gradient Blob */}
                 <div className="absolute top-0 right-0 -z-10 h-[600px] w-[600px] translate-x-1/3 -translate-y-1/4 rounded-full bg-[var(--color-primary)]/5 blur-3xl" />
 
@@ -112,7 +215,8 @@ const LandingPage = () => {
                         {/* Left Column: Content */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
                             transition={{ duration: 0.6 }}
                             className="max-w-xl"
                         >
@@ -171,7 +275,8 @@ const LandingPage = () => {
                         {/* Right Column: Visual */}
                         <motion.div
                             initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }}
                             transition={{ duration: 0.8, delay: 0.2 }}
                             className="relative hidden lg:block"
                         >
