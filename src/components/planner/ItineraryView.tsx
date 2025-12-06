@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, MapPin, Navigation, RefreshCw, Calendar as CalendarIcon } from 'lucide-react';
+import { Clock, MapPin, Navigation, RefreshCw, Calendar as CalendarIcon, Plane } from 'lucide-react';
 import type { ItineraryDay, TripEvent } from '../../types';
 import { Button } from '../common/Button';
 
@@ -96,6 +96,14 @@ export const ItineraryView = ({ destination, days, events, onEdit, onRegenerateD
                             )}
                             <Button variant="outline" size="sm" onClick={onEdit}>
                                 Edit Plan
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.location.href = `/flights?destination=${destination}`}
+                                className="text-[var(--color-primary)] border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5"
+                            >
+                                <Plane className="w-4 h-4 mr-2" /> Find Flights
                             </Button>
                         </div>
                     </div>

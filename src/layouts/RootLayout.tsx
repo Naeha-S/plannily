@@ -38,6 +38,15 @@ const Navbar = () => {
                     <Link to="/plan" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">
                         Plan
                     </Link>
+                    <Link to="/flights" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                        Flights
+                    </Link>
+                    <Link to="/ask-ai" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                        Ask AI
+                    </Link>
+                    <Link to="/local-guide" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                        Local Guide
+                    </Link>
                     {user && (
                         <Link to="/saved" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">
                             Saved Trips

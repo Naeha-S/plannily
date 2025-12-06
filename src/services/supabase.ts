@@ -3,11 +3,27 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase URL or Key');
+const isValidUrl = (url: string) => {
+    try {
+        return Boolean(new URL(url));
+    } catch (e) {
+        return false;
+    }
+};
+
+if (!supabaseUrl || !isValidUrl(supabaseUrl) || !supabaseKey) {
+    console.warn('Missing or invalid Supabase URL or Key. Please check your .env file.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Export a client, but it might fail if used with invalid credentials. 
+// However, the specific error "Invalid supabaseUrl" comes from the constructor validation.
+// We can pass a fallback URL to avoid the immediate crash, but requests will fail.
+// Or better, we can cast a mock object if credentials are bad, to let the UI render.
+
+export const supabase = (supabaseUrl && isValidUrl(supabaseUrl) && supabaseKey)
+    ? createClient(supabaseUrl, supabaseKey)
+    : createClient('https://placeholder.supabase.co', 'placeholder'); // Fallback to avoid crash
+
 
 export const saveItinerary = async (itinerary: any, userId: string) => {
     const { data, error } = await supabase

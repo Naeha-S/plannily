@@ -14,7 +14,8 @@ import {
     Zap,
     Scale,
     Map as MapIcon,
-    ArrowDown
+    ArrowDown,
+    Bot
 } from 'lucide-react';
 
 // Preload the model for faster subsequent loads
@@ -178,6 +179,9 @@ const LandingPage = () => {
                         <button onClick={() => navigate('/saved')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
                             Saved Trips
                         </button>
+                        <button onClick={() => navigate('/flights')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
+                            Flights
+                        </button>
                         <button
                             onClick={() => navigate('/plan')}
                             className="rounded-full bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary)]/90 transition-colors"
@@ -275,6 +279,47 @@ const LandingPage = () => {
                                     <div className="w-full mt-auto">
                                         <button className="w-full rounded-lg border border-stone-300 bg-white py-2.5 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 transition-colors flex items-center justify-center gap-2">
                                             Start planning <ArrowRight size={16} />
+                                        </button>
+                                    </div>
+                                </motion.div>
+
+                                {/* Row 2: AI & Assistant */}
+                                {/* Ask AI Card */}
+                                <motion.div
+                                    whileHover={{ y: -4 }}
+                                    onClick={() => handleAction('/ask-ai')}
+                                    className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
+                                >
+                                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                                        <Bot size={20} />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-stone-900 mb-2">Ask AI Planner</h3>
+                                    <p className="text-sm text-stone-500 mb-6 leading-relaxed flex-grow">
+                                        Chat with our AI to brainstorm ideas or build a full itinerary.
+                                    </p>
+                                    <div className="w-full mt-auto">
+                                        <button className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                                            Chat now <ArrowRight size={16} />
+                                        </button>
+                                    </div>
+                                </motion.div>
+
+                                {/* Local Guide Help Card */}
+                                <motion.div
+                                    whileHover={{ y: -4 }}
+                                    onClick={() => handleAction('/local-guide')}
+                                    className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
+                                >
+                                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                                        <Sparkles size={20} />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-stone-900 mb-2">Local Guide Help</h3>
+                                    <p className="text-sm text-stone-500 mb-6 leading-relaxed flex-grow">
+                                        Find hidden gems, aesthetic spots, and authentic eats instantly.
+                                    </p>
+                                    <div className="w-full mt-auto">
+                                        <button className="w-full rounded-lg border border-stone-300 bg-white py-2.5 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 transition-colors flex items-center justify-center gap-2">
+                                            Explore Guide <ArrowRight size={16} />
                                         </button>
                                     </div>
                                 </motion.div>
