@@ -233,10 +233,14 @@ export const searchSmartLayovers = async (origin: string, destination: string, d
         const validLayovers = layoverResults.filter(r => r !== null) as FlightOffer[];
         const standardOffers = (directResults.data || []) as FlightOffer[];
 
-        // Combine and sort by price
-        const allOffers = [...standardOffers, ...validLayovers].sort((a, b) =>
-            parseFloat(a.price.total) - parseFloat(b.price.total)
-        );
+        // Combine and sort by price, but prioritize smart layovers if prices are similar (within 10%)
+        const allOffers = [...standardOffers, ...validLayovers].sort((a, b) => {
+            // First check if one is a smart layover and the other isn't
+            if (a.isSmartLayover && !b.isSmartLayover) return -1;
+            if (!a.isSmartLayover && b.isSmartLayover) return 1;
+
+            return parseFloat(a.price.total) - parseFloat(b.price.total);
+        });
 
         return allOffers;
 

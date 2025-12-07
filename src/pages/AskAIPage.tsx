@@ -1,14 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Sparkles, Bot, User, Loader2, Compass, Plane, MapPin } from 'lucide-react';
-import { GeminiService } from '../services/gemini';
+import { Send, Sparkles, Bot, User, Loader2, Compass, Plane, MapPin, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { HuggingFaceService } from '../services/huggingface';
 import { supabase } from '../services/supabase';
+import { VoiceAssistant } from '../components/voice/VoiceAssistant';
 
 interface Message {
     id: string;
     role: 'user' | 'ai';
     content: string;
     timestamp: Date;
+    action?: {
+        label: string;
+        type: 'GENERATE_ITINERARY' | 'FIND_FLIGHTS' | 'EXPLORE' | 'OTHER';
+        data: any;
+    };
 }
 
 const QUICK_ACTIONS = [
@@ -18,6 +25,7 @@ const QUICK_ACTIONS = [
 ];
 
 const AskAIPage = () => {
+    const navigate = useNavigate();
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
@@ -73,18 +81,45 @@ const AskAIPage = () => {
         setIsTyping(true);
 
         try {
-            // Call Gemini
-            const aiResponseText = await GeminiService.chat(
+            // Call Hugging Face Llama
+            const aiResponseText = await HuggingFaceService.chat(
                 textToSend,
                 messages.map(m => ({ role: m.role, content: m.content })),
                 userContext
             );
 
+            // Parse for actions
+            const actionRegex = /<<<ACTION:\s*([^|]+)\s*\|\s*([^>]+)>>>/;
+            const match = aiResponseText.match(actionRegex);
+
+            let action = undefined;
+            let displayContent = aiResponseText;
+
+            if (match) {
+                const label = match[1].trim();
+                const rawData = match[2].trim();
+                let type: any = 'OTHER';
+                let data = {};
+
+                try {
+                    data = JSON.parse(rawData);
+                    if (label.toLowerCase().includes('itinerary')) type = 'GENERATE_ITINERARY';
+                    else if (label.toLowerCase().includes('flight')) type = 'FIND_FLIGHTS';
+                    else if (label.toLowerCase().includes('explore')) type = 'EXPLORE';
+                } catch (e) {
+                    console.warn('Failed to parse action data', e);
+                }
+
+                action = { label, type, data };
+                displayContent = aiResponseText.replace(match[0], '').trim();
+            }
+
             const aiMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                content: aiResponseText,
-                timestamp: new Date()
+                content: displayContent,
+                timestamp: new Date(),
+                action
             };
             setMessages(prev => [...prev, aiMsg]);
         } catch (error) {
@@ -97,6 +132,30 @@ const AskAIPage = () => {
             setMessages(prev => [...prev, errorMsg]);
         } finally {
             setIsTyping(false);
+        }
+    };
+
+    const handleActionClick = (action: Exclude<Message['action'], undefined>) => {
+        if (action.type === 'GENERATE_ITINERARY') {
+            navigate('/plan', {
+                state: {
+                    destination: action.data.destination,
+                    preferences: {
+                        startDate: new Date().toISOString().split('T')[0],
+                        endDate: new Date(Date.now() + (action.data.days || 5) * 86400000).toISOString().split('T')[0],
+                        budget: 'medium',
+                        companions: '2',
+                        vibes: [],
+                        interests: [],
+                        travelStyle: 'balanced',
+                        duration: action.data.days || 5
+                    }
+                }
+            });
+        } else if (action.type === 'FIND_FLIGHTS') {
+            navigate('/flights', { state: { from: action.data.origin, to: action.data.destination } });
+        } else if (action.type === 'EXPLORE') {
+            navigate('/local-guide');
         }
     };
 
@@ -132,6 +191,20 @@ const AskAIPage = () => {
                             </div>
                             <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${msg.role === 'ai' ? 'bg-white border border-stone-100 text-stone-700' : 'bg-stone-900 text-white'}`}>
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+
+                                {msg.action && (
+                                    <motion.button
+                                        initial={{ opacity: 0, y: 5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        onClick={() => handleActionClick(msg.action!)}
+                                        className="mt-4 flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-colors"
+                                    >
+                                        <Sparkles size={16} />
+                                        {msg.action.label}
+                                        <ArrowRight size={16} className="ml-1" />
+                                    </motion.button>
+                                )}
+
                                 <span className={`text-[10px] font-bold mt-2 block opacity-50 ${msg.role === 'ai' ? 'text-stone-400' : 'text-stone-400'}`}>
                                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
@@ -191,6 +264,7 @@ const AskAIPage = () => {
                     </form>
                 </div>
             </motion.div>
+            <VoiceAssistant onAction={handleActionClick} />
         </div>
     );
 };

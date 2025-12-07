@@ -1,67 +1,24 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { HuggingFaceService } from './huggingface';
+import { GeminiService } from './gemini';
 import { getUnsplashImage } from './unsplash';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-
-if (!GEMINI_API_KEY) {
-  console.error('Missing Gemini API Key');
-}
-
-if (!GROQ_API_KEY) {
-  console.error('Missing Groq API Key');
-}
-
-const GEMINI_MODELS = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-
-const callGroqAPI = async (prompt: string) => {
-  if (!GROQ_API_KEY) throw new Error('Groq API Key not found');
-
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      messages: [{ role: 'user', content: prompt }],
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.7
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Groq API Error: ${response.statusText}`);
+// Generic generator using HuggingFace (Llama) - replaced DeepSeek due to CORS
+const generateWithLlama = async (prompt: string) => {
+  try {
+    return await HuggingFaceService.generate(prompt);
+  } catch (error) {
+    console.error('Llama generation failed:', error);
+    throw new Error('Failed to generate content via Llama');
   }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content || '';
 };
 
-const generateWithFallback = async (prompt: string) => {
-  // Try Gemini models first
-  for (const modelName of GEMINI_MODELS) {
-    try {
-      console.log(`Attempting generation with ${modelName}...`);
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: modelName });
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
-    } catch (error) {
-      console.warn(`Failed with ${modelName}:`, error);
-      continue;
-    }
-  }
-
-  // Fallback to Groq
+// Generic generator using Gemini
+const generateWithGemini = async (prompt: string) => {
   try {
-    console.log('All Gemini models failed. Falling back to Groq...');
-    return await callGroqAPI(prompt);
+    return await GeminiService.generate(prompt);
   } catch (error) {
-    console.error('Groq fallback failed:', error);
-    throw new Error('All AI models failed to generate content');
+    console.error('Gemini generation failed:', error);
+    throw new Error('Failed to generate content via Gemini');
   }
 };
 
@@ -74,7 +31,7 @@ export const generateDestinations = async (preferences: any) => {
     Duration: ${preferences.duration} days
     Origin: ${preferences.origin}
 
-    Return strictly valid JSON (no markdown):
+    Return strictly valid JSON (no markdown, no backticks):
     {
       "destinations": [
         {
@@ -82,7 +39,7 @@ export const generateDestinations = async (preferences: any) => {
           "name": "City, Country",
           "country": "Country Name",
           "description": "1 sentence reason.",
-          "imageQuery": "Search term for Unsplash (e.g. 'Paris Eiffel Tower')",
+          "imageQuery": "Simple 2-3 word search term for Unsplash (e.g. 'Paris Eiffel')",
           "matchScore": number (0-100),
           "tags": ["tag1", "tag2", "tag3"],
           "weather": { "temp": number, "condition": "String" },
@@ -93,7 +50,7 @@ export const generateDestinations = async (preferences: any) => {
   `;
 
   try {
-    const text = await generateWithFallback(prompt);
+    const text = await generateWithLlama(prompt);
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(cleanText);
 
@@ -183,7 +140,7 @@ export const generateItinerary = async (request: any) => {
   `;
 
   try {
-    const text = await generateWithFallback(prompt);
+    const text = await generateWithGemini(prompt);
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(cleanText);
 
@@ -196,13 +153,15 @@ export const generateItinerary = async (request: any) => {
     }
 
     // Hydrate Activities with Images
-    data.days = await Promise.all(data.days.map(async (day: any) => ({
-      ...day,
-      activities: await Promise.all(day.activities.map(async (act: any) => ({
-        ...act,
-        imageUrl: await getUnsplashImage(act.imageQuery || act.name + ' ' + data.destination)
-      })))
-    })));
+    if (data.days) {
+      data.days = await Promise.all(data.days.map(async (day: any) => ({
+        ...day,
+        activities: await Promise.all(day.activities.map(async (act: any) => ({
+          ...act,
+          imageUrl: await getUnsplashImage(act.imageQuery || act.name + ' ' + data.destination)
+        })))
+      })));
+    }
 
     return data;
   } catch (error) {
@@ -228,7 +187,7 @@ export const regenerateDay = async (currentItinerary: any, dayIndex: number) => 
     `;
 
   try {
-    const text = await generateWithFallback(prompt);
+    const text = await generateWithGemini(prompt);
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const newDay = JSON.parse(cleanText);
 
@@ -265,7 +224,7 @@ export const generateMoreEvents = async (destination: string, date: string) => {
     `;
 
   try {
-    const text = await generateWithFallback(prompt);
+    const text = await generateWithLlama(prompt);
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const events = JSON.parse(cleanText);
 
@@ -278,6 +237,64 @@ export const generateMoreEvents = async (destination: string, date: string) => {
     return eventsWithImages;
   } catch (error) {
     console.error('Error generating more events:', error);
+    throw error;
+  }
+};
+
+export const findLocalPlaces = async (city: string, context?: { savedTrip?: any }) => {
+  let contextPrompt = '';
+  if (context?.savedTrip) {
+    // Extract activity names to exclude
+    const existingActivities = context.savedTrip.days?.flatMap((d: any) => d.activities?.map((a: any) => a.name)) || [];
+    contextPrompt = `
+      CONTEXT: The user has already planned: ${existingActivities.join(', ')}.
+      Do NOT suggest these again.
+      Suggest 4 NEW hidden gems, unique cafes, or viral spots that a seasoned traveler would know.
+      Focus on "aesthetic" and "authentic" vibes.
+      `;
+  } else {
+    contextPrompt = `
+      Focus on 4 unique, aesthetic, and authentic places (hidden gems, local favorites).
+      Avoid generic tourist traps unless they are absolute must-sees (e.g. Eiffel Tower) but try to find a unique angle.
+      `;
+  }
+
+  const prompt = `
+      Find 4 unique places in ${city} for a local travel guide.
+      ${contextPrompt}
+      
+      Return strictly valid JSON (no markdown):
+      [
+        {
+          "id": "unique_id",
+          "name": "Place Name",
+          "description": "Short alluring description (1 sentence).",
+          "type": "photo|food|gem|scenic|experience",
+          "rating": number (4.0-5.0),
+          "imageQuery": "Simple 2-3 word visual search term (e.g. 'Coffee Shop Paris')",
+          "timings": "e.g. 9AM - 6PM",
+          "viral_factor": "Why is this place viral/special? (e.g. 'Famous for pink walls')",
+          "tips": "One local insider tip."
+        }
+      ]
+    `;
+
+  try {
+    const text = await generateWithLlama(prompt);
+    // Robust JSON cleanup
+    const jsonMatch = text.match(/\[[\s\S]*\]/); // Look for the array bracket structure
+    const cleanText = jsonMatch ? jsonMatch[0] : text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const places = JSON.parse(cleanText);
+
+    // Hydrate with images
+    const placesWithImages = await Promise.all(places.map(async (place: any) => ({
+      ...place,
+      image: await getUnsplashImage(place.imageQuery || place.name + ' ' + city)
+    })));
+
+    return placesWithImages;
+  } catch (error) {
+    console.error('Error finding local places:', error);
     throw error;
   }
 };
@@ -297,7 +314,7 @@ export const chatWithAI = async (message: string, context: any) => {
   `;
 
   try {
-    return await generateWithFallback(prompt);
+    return await generateWithLlama(prompt);
   } catch (error) {
     console.error('Error in chat:', error);
     throw error;

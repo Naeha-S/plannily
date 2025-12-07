@@ -74,5 +74,17 @@ ${message}
             console.error('Gemini Chat Error:', error);
             return "I'm having a little trouble connecting to the travel grid right now. 🌩️ Please try again in a moment.";
         }
+    },
+
+    generate: async (prompt: string) => {
+        try {
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            return response.text();
+        } catch (error) {
+            console.error('Gemini Generation Error:', error);
+            throw new Error('Gemini generation failed');
+        }
     }
 };

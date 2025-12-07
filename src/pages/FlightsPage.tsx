@@ -365,7 +365,8 @@ const FlightsPage = () => {
                                             >
                                                 {/* Smart Badge */}
                                                 {(offer.isSmartLayover) && (
-                                                    <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
+                                                    // Animated gradient background
+                                                    <div className="absolute top-0 right-0 left-0 h-1.5 bg-[length:200%_100%] animate-shimmer bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
                                                 )}
 
                                                 <div className="flex-grow space-y-5">
