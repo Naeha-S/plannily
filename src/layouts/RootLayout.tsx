@@ -1,4 +1,4 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, Menu } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
@@ -84,17 +84,22 @@ const Navbar = () => {
 };
 
 const RootLayout = () => {
+    const location = useLocation();
+    const isLandingPage = location.pathname === '/';
+
     return (
         <div className="min-h-screen bg-background text-text font-sans">
-            <Navbar />
+            {!isLandingPage && <Navbar />}
             <main>
                 <Outlet />
             </main>
-            <footer className="border-t border-slate-200 bg-white py-8 mt-20">
-                <div className="container mx-auto px-4 text-center text-sm text-slate-500">
-                    <p>© {new Date().getFullYear()} Plannily. AI-First Travel Planning.</p>
-                </div>
-            </footer>
+            {!isLandingPage && (
+                <footer className="border-t border-slate-200 bg-white py-8 mt-20">
+                    <div className="container mx-auto px-4 text-center text-sm text-slate-500">
+                        <p>© {new Date().getFullYear()} Plannily. AI-First Travel Planning.</p>
+                    </div>
+                </footer>
+            )}
         </div>
     );
 };

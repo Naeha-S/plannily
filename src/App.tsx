@@ -9,6 +9,8 @@ import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import AskAIPage from './pages/AskAIPage';
 import LocalGuidePage from './pages/LocalGuidePage';
+import { PrivacyPage, TermsPage, ContactPage } from './pages/LegalPages';
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   return (
@@ -24,8 +26,12 @@ function App() {
           <Route path="saved" element={<SavedTripsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="login" element={<LoginPage />} />
+          <Route path="privacy" element={<PrivacyPage />} />
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="contact" element={<ContactPage />} />
         </Route>
       </Routes>
+      <Analytics />
     </Router>
   );
 }

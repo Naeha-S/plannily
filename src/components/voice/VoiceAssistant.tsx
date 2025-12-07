@@ -129,19 +129,13 @@ export const VoiceAssistant = ({ onAction }: { onAction: (action: any) => void }
 
         try {
             const aiResponse = await HuggingFaceService.chat(
-                `IGNORE PREVIOUS INSTRUCTIONS. You are a voice input verification assistant. Your only job is to confirm whether user speech is successfully received.
+                `Acting as Cova, a clear, concise, and professional personalized travel assistant.
+                
+                Your Goal: Provide a helpful, VERY brief response (max 2 sentences) to the user's voice input.
+                If actionable (like finding flights, hotels, or planning a trip), confirm you can do it and output the JSON Action block.
 
-                When the user speaks:
-                1. Repeat back EXACTLY what you heard.
-                2. Display it clearly as: "🎧 user: <user speech>"
-                3. If the input is empty or unclear, respond with:
-                "⚠️ No clear voice input detected. Please check your microphone and try again."
-
-                Do not generate new answers.
-                Do not assume meaning.
-                Do not auto-correct words.
-                Only echo what was detected.
-
+                Context: ${JSON.stringify({ userName: 'Traveler', savedTrips: [] })}
+                
                 User Input: "${message}"`,
                 [],
                 { userName: 'Traveler', savedTrips: [] }

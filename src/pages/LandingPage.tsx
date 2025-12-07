@@ -1,111 +1,131 @@
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
+import { useGLTF, OrbitControls, Environment, PresentationControls } from '@react-three/drei';
 import * as THREE from 'three';
 import {
     Compass,
     MapPin,
     ArrowRight,
     Sparkles,
-    Target,
-    Zap,
-    Scale,
+    Bot,
+    Send,
+    Camera,
+    Coffee,
     Map as MapIcon,
     ArrowDown,
-    Bot
+    User
 } from 'lucide-react';
 
-// Preload the model for faster subsequent loads
+// Preload the model
 useGLTF.preload('/models/plane.glb');
+
+// --- PLANE CONFIGURATION ---
+// Adjust these values to control the plane's dimensions and base angles.
+const CONFIG = {
+    SCALE_DESKTOP: 0.25, // 10% smaller than previous 0.28
+    SCALE_MOBILE: 0.12,
+    BASE_PITCH: 0.1,    // Nose up angle (~31.5 degrees)
+    BASE_YAW: Math.PI / 2 + 0.1, // Facing right with slight angle
+    BASE_ROLL: 0.1,      // Banking angle
+};
 
 function Model({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>, isMobile: boolean }) {
     const { scene } = useGLTF('/models/plane.glb');
     const modelRef = useRef<THREE.Group>(null);
+    const [scrolling, setScrolling] = useState(false);
 
     useFrame((state) => {
         if (!modelRef.current) return;
         const currentScroll = scrollY.current;
         const viewportHeight = window.innerHeight;
-        const scrollProgress = Math.min(currentScroll / viewportHeight, 1); // 0 to 1 over the first screen height
-        // Animation Logic
-        // Time-based entrance:
+        const scrollProgress = Math.min(currentScroll / viewportHeight, 1);
+
+        // Update local state for interaction logic
+        if (scrollProgress > 0.05 && !scrolling) setScrolling(true);
+        if (scrollProgress <= 0.05 && scrolling) setScrolling(false);
+
         const time = state.clock.getElapsedTime();
-        const entranceDuration = 3.0; // Slower entrance
+        const entranceDuration = 3.5;
         const entranceProgress = Math.min(time / entranceDuration, 1);
-        // Ease out cubic
         const easeOut = 1 - Math.pow(1 - entranceProgress, 3);
 
         let startPos, centerPos, exitPos;
 
         if (isMobile) {
-            // Mobile: Top Center -> Center -> Takeoff (Up & Forward)
-            startPos = new THREE.Vector3(0, 4, 0);
-            centerPos = new THREE.Vector3(0, -0.5, 0);
-            exitPos = new THREE.Vector3(0, 5, -5); // Fly up and away
+            startPos = new THREE.Vector3(-3, -1, 0);
+            centerPos = new THREE.Vector3(0.2, 0.4, 0);
+            exitPos = new THREE.Vector3(4, 8, -2);
         } else {
-            // Desktop: Top Right -> Center -> Bottom Left
-            startPos = new THREE.Vector3(8, 6, 0); // Top Right
-            centerPos = new THREE.Vector3(0, -1, 0); // Center
-            exitPos = new THREE.Vector3(-8, -10, 2); // Bottom Left exit
+            // User's Custom Path (Preserved)
+            startPos = new THREE.Vector3(-21, -25, 5);
+            centerPos = new THREE.Vector3(0.2, .25, 1);
+            exitPos = new THREE.Vector3(22, 17, -5);
         }
 
-        // Interpolate entrance
         const currentPos = new THREE.Vector3().lerpVectors(startPos, centerPos, easeOut);
 
-        // Scroll-based Exit
+        // --- SCROLL EXIT LOGIC ---
         if (scrollProgress > 0) {
             let exitProgress = 0;
-            // Delay exit slightly
-            if (scrollProgress > 0.1) {
-                exitProgress = (scrollProgress - 0.1) / 0.9;
+            if (scrollProgress > 0.05) {
+                exitProgress = (scrollProgress - 0.05) / 0.95;
             }
-
+            // Lerp from the "center" (held position) to the "exit" position
             currentPos.lerp(exitPos, exitProgress);
 
-            // Rotation Logic
             if (modelRef.current) {
                 if (isMobile) {
-                    // Takeoff pitch (nose up)
-                    modelRef.current.rotation.x = -exitProgress * 0.8;
-                    modelRef.current.rotation.z = 0; // Keep straight
+                    modelRef.current.rotation.x = -exitProgress * 0.5;
+                    modelRef.current.rotation.y = Math.PI / 2;
                 } else {
-                    // Desktop: Top Right -> Bottom Left trajectory
-                    // Align nose with descent path
-                    const baseYaw = Math.PI * 0.35; // Face more Left
-                    const basePitch = -0.2; // Nose Down (Match descent & Show Top)
-                    const baseRoll = 0.5; // Bank to show top
-
-                    modelRef.current.rotation.x = basePitch;
-                    // Turn Left as it exits
-                    modelRef.current.rotation.y = baseYaw + (exitProgress * 0.5);
-                    // Bank Left
-                    modelRef.current.rotation.z = baseRoll - (exitProgress * 0.5);
+                    // Stable scroll exit - Lock to base angles
+                    modelRef.current.rotation.x = CONFIG.BASE_PITCH;
+                    modelRef.current.rotation.y = CONFIG.BASE_YAW;
+                    modelRef.current.rotation.z = CONFIG.BASE_ROLL;
                 }
             }
         } else {
-            // Initial static rotation (before scroll)
+            // Static / Entrance Phase
             if (modelRef.current && !isMobile) {
-                // Align with Top-Right -> Center path
-                modelRef.current.rotation.x = -0.2; // Nose Down
-                modelRef.current.rotation.y = Math.PI * 0.35; // Face Left
-                modelRef.current.rotation.z = 0.5; // Bank
+                // If the user isn't interacting (PresentationControls handles its own rotation),
+                // we set the base rotation on the primitive.
+                // However, PresentationControls wraps this. 
+                // To ensure the "base" is correct inside the wrapper, we set it here.
+                modelRef.current.rotation.set(CONFIG.BASE_PITCH, CONFIG.BASE_YAW, CONFIG.BASE_ROLL);
+            }
+            if (modelRef.current && isMobile) {
+                modelRef.current.rotation.set(0, Math.PI / 2, 0);
             }
         }
 
+        // Position is applied to the primitive (the plane itself)
         modelRef.current.position.copy(currentPos);
     });
 
-    return <primitive
-        ref={modelRef}
-        object={scene}
-        scale={isMobile ? 0.12 : 0.3} // Scale 0.3
-    />;
+    return (
+        <PresentationControls
+            enabled={!scrolling && !isMobile} // Disable interaction when scrolling
+            global={false} // Only interact with the plane
+            cursor={true}
+            snap={true} // Snap back to original angle when released
+            speed={1.5}
+            zoom={0.8}
+            rotation={[0, 0, 0]} // Initial rotation offset
+            polar={[-Math.PI / 4, Math.PI / 4]} // Limit vertical rotation
+            azimuth={[-Math.PI / 4, Math.PI / 4]} // Limit horizontal rotation
+        >
+            <primitive
+                ref={modelRef}
+                object={scene}
+                scale={isMobile ? CONFIG.SCALE_MOBILE : CONFIG.SCALE_DESKTOP}
+            />
+        </PresentationControls>
+    );
 }
 
-// Scene component to handle lighting and environment
 function Scene({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>, isMobile: boolean }) {
     return (
         <>
@@ -120,22 +140,23 @@ function Scene({ scrollY, isMobile }: { scrollY: React.MutableRefObject<number>,
 const LandingPage = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState<any>(null);
-    const scrollY = useRef(0);
+    const scrollRef = useRef(0);
     const [isMobile, setIsMobile] = useState(false);
 
-    // Track scroll position
+    // Framer Motion scroll hooks
+    const { scrollY } = useScroll();
+    const canvasOpacity = useTransform(scrollY, [0, 500], [1, 0]);
+    const canvasPointerEvents = useTransform(scrollY, (y) => y > 500 ? 'none' : 'auto');
+
     useEffect(() => {
-        const handleScroll = () => {
-            scrollY.current = window.scrollY;
-        };
+        const handleScroll = () => { scrollRef.current = window.scrollY; };
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Track mobile state
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile(); // Initial check
+        checkMobile();
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
@@ -145,11 +166,9 @@ const LandingPage = () => {
     }, []);
 
     const handleAction = (path: string) => {
-        if (!user) {
-            navigate('/login');
-        } else {
-            navigate(path);
-        }
+        console.log("Navigating to:", path); // Debug log
+        if (!user && path !== '/login') navigate('/login');
+        else navigate(path);
     };
 
     const scrollToContent = () => {
@@ -158,287 +177,385 @@ const LandingPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-text)] font-sans selection:bg-[var(--color-primary)] selection:text-white">
+        <div className="relative min-h-screen bg-[var(--color-background)] text-[var(--color-text)] font-sans selection:bg-[var(--color-primary)] selection:text-white">
 
-            {/* Navigation Shell */}
-            <nav className="fixed top-0 left-0 right-0 z-50 border-b border-stone-200 bg-[var(--color-background)]/80 backdrop-blur-md">
-                <div className="container mx-auto flex h-16 items-center justify-between px-6 max-w-7xl">
-                    {/* Logo */}
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                        <img src="/plannily_logo.png" alt="Plannily Logo" className="h-10 w-auto object-contain" />
+            {/* GLOBAL NOISE TEXTURE */}
+            <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+
+            {/* FLOATING PILL NAVIGATION (ONLY ONE) */}
+            <div className="fixed top-6 left-0 right-0 z-50 flex justify-center pointer-events-none">
+                <nav className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl shadow-stone-900/5 rounded-full px-2 py-1.5 flex items-center gap-1 max-w-2xl mx-4">
+                    <div className="pl-4 pr-6 flex items-center gap-2 cursor-pointer border-r border-stone-200 mr-2" onClick={() => navigate('/')}>
+                        <img src="/plannily_logo.png" alt="Plannily" className="h-6 w-auto object-contain" />
                     </div>
 
-                    {/* Desktop Nav */}
-                    <div className="hidden md:flex items-center gap-8">
-                        <button onClick={() => navigate('/discover')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Discover
-                        </button>
-                        <button onClick={() => navigate('/plan')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Plan
-                        </button>
-                        <button onClick={() => navigate('/saved')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Saved Trips
-                        </button>
-                        <button onClick={() => navigate('/flights')} className="text-sm font-medium text-stone-600 hover:text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-all">
-                            Flights
-                        </button>
-                        <button
-                            onClick={() => navigate('/plan')}
-                            className="rounded-full bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary)]/90 transition-colors"
-                        >
-                            Start planning
-                        </button>
-                    </div>
-                </div>
-            </nav>
-
-            {/* 3D Canvas Background (Fixed) */}
-            <div className="fixed inset-0 z-10 pointer-events-none">
-                <Canvas dpr={[1, 2]} camera={{ fov: 45, position: [0, 0, 10] }} style={{ pointerEvents: 'auto' }}>
-                    <Suspense fallback={null}>
-                        <Scene scrollY={scrollY} isMobile={isMobile} />
-                    </Suspense>
-                    <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
-                </Canvas>
-            </div>
-
-            {/* Hero Section Content */}
-            <section className="relative h-screen w-full flex items-center justify-center overflow-hidden pt-16 z-0">
-                {/* Background Title */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                    <h1 className="text-[15vw] font-black text-stone-200/50 tracking-tighter leading-none text-center">
-                        TAKE<br />FLIGHT
-                    </h1>
-                </div>
-
-                {/* Scroll Indicator */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 animate-bounce text-stone-400 cursor-pointer" onClick={scrollToContent}>
-                    <ArrowDown size={32} />
-                </div>
-            </section>
-
-            {/* Features / Intro Section (Previously Hero) */}
-            <section id="features-section" className="relative py-20 lg:py-32 overflow-hidden bg-stone-50/80 backdrop-blur-sm z-20">
-                {/* Background Gradient Blob */}
-                <div className="absolute top-0 right-0 -z-10 h-[600px] w-[600px] translate-x-1/3 -translate-y-1/4 rounded-full bg-[var(--color-primary)]/5 blur-3xl" />
-
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="grid lg:grid-cols-2 gap-16 items-center">
-
-                        {/* Left Column: Content */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.6 }}
-                            className="max-w-xl"
-                        >
-                            <h1 className="text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 leading-[1.1] mb-6">
-                                AI-first trips,<br />
-                                tailored to you.
-                            </h1>
-                            <p className="text-lg text-stone-600 mb-10 leading-relaxed">
-                                Experience travel planning that feels human. Whether you're exploring the unknown or optimizing a dream trip, we handle the details.
-                            </p>
-
-                            {/* Two Primary Path Cards */}
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                {/* Discovery Card */}
-                                <motion.div
-                                    whileHover={{ y: -4 }}
-                                    onClick={() => handleAction('/discover')}
-                                    className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
-                                >
-                                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
-                                        <Compass size={20} />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-stone-900 mb-2">I don't know where to go</h3>
-                                    <p className="text-sm text-stone-500 mb-6 leading-relaxed flex-grow">
-                                        Discover destinations that actually match your vibe, budget, and pace.
-                                    </p>
-                                    <div className="w-full mt-auto">
-                                        <button className="w-full rounded-lg bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary)]/90 transition-colors flex items-center justify-center gap-2">
-                                            Inspire me <ArrowRight size={16} />
-                                        </button>
-                                    </div>
-                                </motion.div>
-
-                                {/* Planning Card */}
-                                <motion.div
-                                    whileHover={{ y: -4 }}
-                                    onClick={() => handleAction('/plan')}
-                                    className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
-                                >
-                                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">
-                                        <MapPin size={20} />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-stone-900 mb-2">I know where to go</h3>
-                                    <p className="text-sm text-stone-500 mb-6 leading-relaxed flex-grow">
-                                        Turn your city and dates into a human-paced, optimized plan.
-                                    </p>
-                                    <div className="w-full mt-auto">
-                                        <button className="w-full rounded-lg border border-stone-300 bg-white py-2.5 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 transition-colors flex items-center justify-center gap-2">
-                                            Start planning <ArrowRight size={16} />
-                                        </button>
-                                    </div>
-                                </motion.div>
-
-                                {/* Row 2: AI & Assistant */}
-                                {/* Ask AI Card */}
-                                <motion.div
-                                    whileHover={{ y: -4 }}
-                                    onClick={() => handleAction('/ask-ai')}
-                                    className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
-                                >
-                                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                                        <Bot size={20} />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-stone-900 mb-2">Ask AI Planner</h3>
-                                    <p className="text-sm text-stone-500 mb-6 leading-relaxed flex-grow">
-                                        Chat with our AI to brainstorm ideas or build a full itinerary.
-                                    </p>
-                                    <div className="w-full mt-auto">
-                                        <button className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
-                                            Chat now <ArrowRight size={16} />
-                                        </button>
-                                    </div>
-                                </motion.div>
-
-                                {/* Local Guide Help Card */}
-                                <motion.div
-                                    whileHover={{ y: -4 }}
-                                    onClick={() => handleAction('/local-guide')}
-                                    className="group cursor-pointer rounded-xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col items-start"
-                                >
-                                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                                        <Sparkles size={20} />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-stone-900 mb-2">Local Guide Help</h3>
-                                    <p className="text-sm text-stone-500 mb-6 leading-relaxed flex-grow">
-                                        Find hidden gems, aesthetic spots, and authentic eats instantly.
-                                    </p>
-                                    <div className="w-full mt-auto">
-                                        <button className="w-full rounded-lg border border-stone-300 bg-white py-2.5 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 transition-colors flex items-center justify-center gap-2">
-                                            Explore Guide <ArrowRight size={16} />
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        </motion.div>
-
-                        {/* Right Column: Visual */}
-                        <motion.div
-                            initial={{ opacity: 0, x: 20 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.8, delay: 0.2 }}
-                            className="relative hidden lg:block"
-                        >
-                            {/* Glassmorphism Card */}
-                            <div className="relative z-10 w-full max-w-md mx-auto rounded-2xl border border-white/20 bg-white/60 backdrop-blur-xl shadow-2xl p-6">
-                                {/* Mock Header */}
-                                <div className="flex items-center justify-between mb-6 border-b border-stone-200/50 pb-4">
-                                    <div>
-                                        <h3 className="text-xl font-bold text-stone-900">Kyoto, Japan</h3>
-                                        <p className="text-sm text-stone-500">Oct 12 - Oct 18 • 2 Travelers</p>
-                                    </div>
-                                    <div className="h-10 w-10 rounded-full bg-stone-100 flex items-center justify-center">
-                                        <MapIcon size={18} className="text-stone-500" />
-                                    </div>
-                                </div>
-
-                                {/* Mock Timeline */}
-                                <div className="space-y-6">
-                                    {[
-                                        { time: '09:00 AM', title: 'Fushimi Inari Taisha', type: 'Sightseeing' },
-                                        { time: '12:30 PM', title: 'Nishiki Market Lunch', type: 'Food' },
-                                        { time: '03:00 PM', title: 'Tea Ceremony', type: 'Culture' },
-                                    ].map((item, i) => (
-                                        <div key={i} className="flex gap-4">
-                                            <div className="flex flex-col items-center">
-                                                <div className="h-3 w-3 rounded-full bg-[var(--color-primary)] ring-4 ring-[var(--color-primary)]/10" />
-                                                {i !== 2 && <div className="w-0.5 h-full bg-stone-200 my-1" />}
-                                            </div>
-                                            <div>
-                                                <span className="text-xs font-medium text-stone-400">{item.time}</span>
-                                                <h4 className="text-sm font-semibold text-stone-800">{item.title}</h4>
-                                                <span className="text-xs text-[var(--color-primary)] bg-[var(--color-primary)]/5 px-2 py-0.5 rounded-full mt-1 inline-block">
-                                                    {item.type}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Floating Badge */}
-                                <div className="absolute -bottom-6 -right-6 rounded-xl bg-white p-4 shadow-lg border border-stone-100 flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                                        <Sparkles size={18} />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-stone-500">Match Score</p>
-                                        <p className="text-lg font-bold text-stone-900">98%</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Decorative Elements */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-tr from-[var(--color-primary)]/10 to-transparent rounded-full blur-3xl -z-10" />
-                        </motion.div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Feature Strip */}
-            <section className="py-24 bg-[var(--color-primary)]/5 border-y border-[var(--color-primary)]/10">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="grid md:grid-cols-3 gap-12">
-                        {[
-                            {
-                                icon: Target,
-                                title: "Hyper-Personalized",
-                                desc: "Your vibes, rhythm, and budget drive every suggestion. No generic lists."
-                            },
-                            {
-                                icon: Zap,
-                                title: "Live & Dynamic",
-                                desc: "Plans update with real-time weather, events, and fares."
-                            },
-                            {
-                                icon: Scale,
-                                title: "Transparent",
-                                desc: "Clear trade-offs for every choice. No hidden bias or ads."
-                            }
-                        ].map((feature, i) => (
-                            <div key={i} className="flex flex-col items-start">
-                                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-stone-200 text-stone-700 shadow-sm">
-                                    <feature.icon size={24} strokeWidth={1.5} />
-                                </div>
-                                <h3 className="text-lg font-bold text-stone-900 mb-2">{feature.title}</h3>
-                                <p className="text-stone-600 leading-relaxed text-sm">
-                                    {feature.desc}
-                                </p>
-                            </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        {['Discover', 'Plan', 'Flights'].map((item) => (
+                            <button
+                                key={item}
+                                onClick={() => navigate(`/${item.toLowerCase()}`)}
+                                className="px-4 py-2 text-sm font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-full transition-all"
+                            >
+                                {item}
+                            </button>
                         ))}
                     </div>
+
+                    <div className="ml-2 flex items-center gap-2 pl-2 border-l border-stone-200">
+                        {user ? (
+                            <button
+                                onClick={() => navigate('/profile')}
+                                className="h-9 w-9 rounded-full bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-[var(--color-primary)] hover:text-white transition-colors"
+                            >
+                                <User size={18} />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => navigate('/login')}
+                                className="bg-stone-900 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-stone-900/20 hover:scale-105 transition-transform active:scale-95"
+                            >
+                                Login
+                            </button>
+                        )}
+                    </div>
+                </nav>
+            </div>
+
+            {/* 3D BACKGROUND */}
+            <motion.div
+                style={{ opacity: canvasOpacity, pointerEvents: canvasPointerEvents as any }}
+                className="fixed inset-0 z-10"
+            >
+                <Canvas dpr={[1, 2]} camera={{ fov: 45, position: [0, 0, 10] }}>
+                    <Suspense fallback={null}>
+                        <Scene scrollY={scrollRef} isMobile={isMobile} />
+                    </Suspense>
+                    <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} enabled={false} />
+                </Canvas>
+            </motion.div>
+
+            {/* HERO SECTION */}
+            <section className="relative h-screen w-full flex items-center justify-center overflow-hidden z-0">
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none px-4">
+                    <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="mt-32"
+                    >
+                        <h1 className="text-[12vw] md:text-[14vw] font-sans font-black text-stone-300/60 tracking-tighter leading-none text-center mix-blend-multiply">
+                            TAKE<br />FLIGHT
+                        </h1>
+                    </motion.div>
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.8, duration: 1 }}
+                        className="mt-6 text-stone-500 font-medium tracking-widest uppercase text-sm"
+                    >
+                        The Art of Modern Travel
+                    </motion.p>
+                </div>
+
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 animate-bounce text-stone-400 cursor-pointer" onClick={scrollToContent}>
+                    <ArrowDown size={24} />
                 </div>
             </section>
 
-            {/* Footer */}
-            <footer className="bg-stone-900 text-stone-400 py-12 border-t border-stone-800">
-                <div className="container mx-auto px-6 max-w-7xl flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex flex-col md:flex-row items-center gap-6">
-                        <span className="text-stone-100 font-bold font-serif text-lg">Plannily</span>
-                        <span className="hidden md:inline text-stone-700">|</span>
-                        <span className="text-sm">© 2025 Plannily. All rights reserved.</span>
+            {/* SELECTION SECTION: Choose Your Path */}
+            <section id="features-section" className="relative py-32 bg-[var(--color-background)] z-20">
+                <div className="container mx-auto px-6 max-w-6xl">
+                    <div className="text-center mb-24 max-w-3xl mx-auto">
+                        <span className="text-[var(--color-primary)] font-bold tracking-widest uppercase text-xs">Begin Your Journey</span>
+                        <h2 className="font-serif text-5xl md:text-6xl font-bold text-stone-900 mt-4 leading-tight">
+                            How do you want to <br />
+                            <span className="italic relative inline-block">
+                                explore?
+                                <motion.span
+                                    initial={{ width: 0 }}
+                                    whileInView={{ width: '100%' }}
+                                    transition={{ duration: 0.8, delay: 0.5 }}
+                                    className="absolute bottom-1 left-0 h-3 bg-[var(--color-primary)]/20 -z-10"
+                                />
+                            </span>
+                        </h2>
                     </div>
-                    <div className="flex items-center gap-8 text-sm">
-                        <a href="#" className="hover:text-white transition-colors">Privacy</a>
-                        <a href="#" className="hover:text-white transition-colors">Terms</a>
-                        <a href="#" className="hover:text-white transition-colors">Contact</a>
+
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* DISCOVERY CARD (White) */}
+                        <motion.div
+                            whileHover={{ y: -5 }}
+                            onClick={() => handleAction('/discover')}
+                            className="group relative cursor-pointer rounded-[2.5rem] bg-white border border-stone-100 p-10 flex flex-col items-start shadow-xl shadow-stone-200/50 hover:shadow-2xl hover:shadow-stone-200/80 transition-all duration-500 overflow-hidden"
+                        >
+                            <div className="absolute -right-10 -top-10 h-64 w-64 bg-[var(--color-primary)]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+
+                            <div className="mb-8 h-16 w-16 rounded-2xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] group-hover:scale-110 transition-transform duration-500">
+                                <Compass size={32} />
+                            </div>
+
+                            <h3 className="font-serif text-4xl font-bold text-stone-900 mb-4 z-10">Wanderlust</h3>
+                            <p className="text-stone-500 text-lg leading-relaxed mb-10 flex-grow max-w-sm z-10">
+                                "I don't know where to go." <br />
+                                Discover curated destinations tailored to your vibe.
+                            </p>
+
+                            <div className="flex items-center gap-3 text-[var(--color-primary)] font-bold group-hover:translate-x-2 transition-transform">
+                                Get Inspired <ArrowRight size={20} />
+                            </div>
+                        </motion.div>
+
+                        {/* PLANNER CARD WITH ITINERARY VISUAL */}
+                        <motion.div
+                            whileHover={{ y: -5 }}
+                            onClick={() => handleAction('/plan')}
+                            className="group relative cursor-pointer rounded-[2.5rem] bg-white border border-stone-100 p-0 flex flex-col shadow-xl shadow-stone-200/50 hover:shadow-2xl hover:shadow-stone-200/80 transition-all duration-500 overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 w-1/2 h-full bg-stone-50/50 rounded-l-[2.5rem] -z-10 group-hover:w-full transition-all duration-500" />
+
+                            <div className="p-10 pb-0 z-10">
+                                <div className="mb-8 h-16 w-16 rounded-2xl bg-stone-900 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-500">
+                                    <MapPin size={32} />
+                                </div>
+                                <h3 className="font-serif text-4xl font-bold text-stone-900 mb-4">Architect</h3>
+                                <p className="text-stone-500 text-lg leading-relaxed mb-8 max-w-sm">
+                                    "I know where to go." <br />
+                                    Build a detailed itinerary.
+                                </p>
+                            </div>
+
+                            {/* MINI ITINERARY VISUAL AT BOTTOM/RIGHT */}
+                            <div className="mt-auto w-full px-6 pb-6 lg:absolute lg:bottom-6 lg:right-6 lg:w-48 lg:p-0">
+                                <div className="bg-white rounded-2xl border border-stone-200 shadow-lg p-4 space-y-3 opacity-90 scale-95 group-hover:scale-100 transition-all duration-500">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-stone-400 uppercase tracking-widest border-b border-stone-100 pb-2">
+                                        Today
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-4 w-4 rounded-full border-2 border-[var(--color-primary)] flex items-center justify-center">
+                                            <div className="h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-stone-900">09:00 AM</div>
+                                            <div className="text-[10px] text-stone-500">Morning Coffee</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 opacity-50">
+                                        <div className="h-4 w-4 rounded-full border-2 border-stone-300" />
+                                        <div>
+                                            <div className="text-xs font-bold text-stone-900">11:30 AM</div>
+                                            <div className="text-[10px] text-stone-500">Art Museum</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            </section>
+
+            {/* AI ASSISTANT SECTION - Sleeker & Cleaner */}
+            <section className="relative py-32 bg-white text-stone-900 overflow-hidden z-20">
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-stone-50 to-transparent pointer-events-none" />
+
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="grid lg:grid-cols-2 gap-24 items-center">
+
+                        {/* INTERACTIVE CHAT COMPONENT (Sleeker) */}
+                        <motion.div
+                            initial={{ opacity: 0, x: -30 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }}
+                            className="order-2 lg:order-1"
+                        >
+                            <div className="relative rounded-[2rem] bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] border border-stone-100 p-8 overflow-hidden">
+                                {/* Decorative Blur */}
+                                <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-50" />
+
+                                {/* Chat Header */}
+                                <div className="relative flex items-center justify-between pb-6 mb-2">
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                            <div className="h-12 w-12 rounded-2xl bg-stone-900 flex items-center justify-center shadow-lg shadow-stone-900/20">
+                                                <Bot size={24} className="text-white" />
+                                            </div>
+                                            <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-serif font-bold text-xl text-stone-900">Cova AI</h4>
+                                            <p className="text-xs text-stone-500 font-medium">Always Active</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Chat Body */}
+                                <div className="space-y-6 text-[15px] relative z-10">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.2 }}
+                                        className="bg-stone-50 rounded-2xl rounded-tl-none p-5 text-stone-600 max-w-[90%]"
+                                    >
+                                        Find me a quiet cafe in Tokyo with a garden view. 🌿
+                                    </motion.div>
+
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.4 }}
+                                        className="ml-auto bg-stone-900 text-white rounded-2xl rounded-tr-none p-5 max-w-[90%] shadow-xl shadow-stone-900/10"
+                                    >
+                                        <p className="mb-4 leading-relaxed">
+                                            You'll love <strong>Nezu Museum Cafe</strong>. Floor-to-ceiling glass windows overlooking a traditional Japanese garden. Pure zen.
+                                        </p>
+                                        <div className="aspect-[16/9] w-full bg-stone-800 rounded-xl overflow-hidden relative group cursor-pointer">
+                                            <img src="https://images.unsplash.com/photo-1557313063-488f780e340a?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" alt="Cafe" />
+                                            <div className="absolute bottom-3 left-3 bg-white/20 backdrop-blur-md border border-white/20 px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
+                                                <Sparkles size={10} /> Top Pick
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </div>
+
+                                {/* Input Field */}
+                                <div className="mt-8 relative z-10">
+                                    <div className="h-14 w-full bg-white rounded-full border border-stone-200 shadow-sm flex items-center px-2 pl-6 gap-3 focus-within:ring-2 focus-within:ring-stone-900/5 transition-shadow">
+                                        <span className="text-stone-400 font-medium">Ask anything...</span>
+                                        <button className="ml-auto h-10 w-10 rounded-full bg-stone-900 flex items-center justify-center text-white hover:scale-105 transition-transform">
+                                            <Send size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+
+                        {/* TEXT CONTENT */}
+                        <motion.div
+                            initial={{ opacity: 0, x: 30 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }}
+                            className="order-1 lg:order-2 space-y-8"
+                        >
+                            <span className="text-[var(--color-primary)] font-bold tracking-widest uppercase text-xs">Voice & Chat Enabled</span>
+                            <h2 className="font-serif text-5xl md:text-6xl text-stone-900 leading-[1.1]">
+                                Your Intelligent <br />
+                                <span className="italic relative inline-block text-stone-400">
+                                    Travel Companion.
+                                    <div className="absolute -bottom-2 left-0 w-full h-[2px] bg-stone-200"></div>
+                                </span>
+                            </h2>
+                            <p className="text-lg text-stone-500 leading-relaxed max-w-md">
+                                Stop browsing 50 tabs. Chat with Cova to brainstorm, refine plans, or ask for specific vibes. It's like texting your most well-traveled friend.
+                            </p>
+                            <button
+                                onClick={() => handleAction('/ask-ai')}
+                                className="inline-flex items-center gap-3 bg-white border border-stone-200 text-stone-900 hover:bg-stone-50 px-8 py-4 rounded-full font-bold transition-all duration-300 shadow-lg hover:shadow-xl group"
+                            >
+                                Start Chatting <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        </motion.div>
+                    </div>
+                </div>
+            </section>
+
+            {/* LOCAL GUIDE SECTION - Editorial Layout (RESTORED) */}
+            <section className="relative py-32 bg-stone-50 z-20 overflow-hidden">
+                {/* Decorative Text Texture */}
+                <div className="absolute top-20 left-10 text-[10rem] font-serif opacity-[0.03] pointer-events-none select-none">
+                    LOCAL
+                </div>
+
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="grid lg:grid-cols-2 gap-24 items-center">
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            className="space-y-8"
+                        >
+                            <span className="text-stone-500 font-bold tracking-widest uppercase text-xs line-through decoration-[var(--color-primary)]">Tourist Traps</span>
+                            <h2 className="font-serif text-5xl md:text-6xl text-stone-900 leading-[1.1]">
+                                Live Like a <br />
+                                <span className="italic text-[var(--color-primary)]">Local.</span>
+                            </h2>
+                            <p className="text-lg text-stone-600 leading-relaxed">
+                                Discover authentic eats, aesthetic photo spots, and hidden corners. Real-time, location-based suggestions that actually pass the vibe check.
+                            </p>
+
+                            <div className="flex gap-6 pt-4">
+                                <div className="flex items-center gap-2 text-sm font-bold text-stone-900">
+                                    <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                        <Sparkles size={16} />
+                                    </div>
+                                    <span>Hidden Gems</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm font-bold text-stone-900">
+                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                        <MapIcon size={16} />
+                                    </div>
+                                    <span>Interactive Map</span>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => handleAction('/local-guide')}
+                                className="mt-8 bg-stone-900 text-white px-8 py-4 rounded-full font-bold shadow-xl shadow-stone-900/10 hover:-translate-y-1 transition-transform"
+                            >
+                                Explore Guide
+                            </button>
+                        </motion.div>
+
+                        {/* POLAROID STACK */}
+                        <div className="relative h-[600px] w-full flex items-center justify-center">
+                            {/* Back Photo */}
+                            <motion.div
+                                whileHover={{ rotate: -8, scale: 1.05 }}
+                                className="absolute w-72 bg-white p-3 pb-8 shadow-xl shadow-stone-200/50 rotate-[-6deg] z-10 transition-all duration-500 group cursor-pointer"
+                            >
+                                <div className="aspect-[4/5] bg-stone-200 overflow-hidden mb-3 relative">
+                                    <img src="https://images.unsplash.com/photo-1542051841857-5f90071e7989?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover" />
+                                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-full text-stone-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                        <Camera size={16} />
+                                    </div>
+                                </div>
+                                <div className="font-serif text-center font-bold text-stone-900 italic">Secret Alleyways</div>
+                            </motion.div>
+
+                            {/* Front Photo */}
+                            <motion.div
+                                whileHover={{ rotate: 8, scale: 1.05 }}
+                                className="absolute w-72 bg-white p-3 pb-8 shadow-2xl shadow-stone-300/50 rotate-[6deg] z-20 transition-all duration-500 group cursor-pointer"
+                            >
+                                <div className="aspect-[4/5] bg-stone-200 overflow-hidden mb-3 relative">
+                                    <img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover" />
+                                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-full text-stone-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                        <Coffee size={16} />
+                                    </div>
+                                </div>
+                                <div className="font-serif text-center font-bold text-stone-900 italic">Hidden Matcha</div>
+                            </motion.div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* REMOVED EXTRA FEATURES SECTION */}
+
+            {/* FOOTER */}
+            <footer className="bg-stone-950 text-stone-500 py-16 z-20 relative">
+                <div className="container mx-auto px-6 max-w-7xl flex flex-col md:flex-row justify-between items-center gap-8">
+                    <div className="flex items-center gap-3">
+                        <img src="/plannily_logo.png" alt="Plannily" className="h-8 w-auto opacity-50 grayscale" />
+                        <span className="font-serif text-stone-400">© 2025 Plannily</span>
+                    </div>
+                    <div className="flex gap-8 text-sm font-medium">
+                        <button onClick={() => navigate('/privacy')} className="hover:text-white transition-colors">Privacy</button>
+                        <button onClick={() => navigate('/terms')} className="hover:text-white transition-colors">Terms</button>
+                        <button onClick={() => navigate('/contact')} className="hover:text-white transition-colors">Contact</button>
                     </div>
                 </div>
             </footer>
+
         </div>
     );
 };
