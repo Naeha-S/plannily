@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, MapPin, DollarSign, Users, ArrowRight, ArrowLeft, Plane } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowRight, ArrowLeft, Plane } from 'lucide-react';
 import { Button } from '../common/Button';
 
 interface PlannerInputProps {
@@ -11,9 +11,10 @@ export const PlannerInput = ({ onPlan }: PlannerInputProps) => {
     const [formData, setFormData] = useState({
         destination: '',
         origin: '', // Optional now
+        startDate: new Date().toISOString().split('T')[0],
         days: 3,
         travelers: 2,
-        budget: 'medium',
+        budget: 3000,
         interests: [] as string[],
         pace: 'balanced',
         isMulticity: false
@@ -110,18 +111,31 @@ export const PlannerInput = ({ onPlan }: PlannerInputProps) => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-stone-600 mb-2">Origin (Optional)</label>
+                                    <label className="block text-sm font-medium text-stone-600 mb-2">Start Date</label>
                                     <div className="relative group">
-                                        <Plane className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
                                         <input
-                                            type="text"
-                                            value={formData.origin}
-                                            onChange={(e) => setFormData({ ...formData, origin: e.target.value.toUpperCase() })}
-                                            placeholder="e.g. JFK"
-                                            className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-all"
-                                            maxLength={3}
+                                            type="date"
+                                            value={formData.startDate}
+                                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-all"
+                                            required
                                         />
                                     </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-stone-600 mb-2">Origin (Optional)</label>
+                                <div className="relative group">
+                                    <Plane className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={formData.origin}
+                                        onChange={(e) => setFormData({ ...formData, origin: e.target.value.toUpperCase() })}
+                                        placeholder="e.g. JFK"
+                                        className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-all"
+                                        maxLength={3}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -148,18 +162,23 @@ export const PlannerInput = ({ onPlan }: PlannerInputProps) => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-stone-600 mb-2">Budget</label>
-                                <div className="relative group">
-                                    <DollarSign className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
-                                    <select
+                                <label className="block text-sm font-medium text-stone-600 mb-2">
+                                    Budget (per person): ${formData.budget}
+                                </label>
+                                <div className="relative group pt-2">
+                                    <input
+                                        type="range"
+                                        min="500"
+                                        max="10000"
+                                        step="100"
                                         value={formData.budget}
-                                        onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-all appearance-none bg-white cursor-pointer"
-                                    >
-                                        <option value="low">Budget</option>
-                                        <option value="medium">Moderate</option>
-                                        <option value="high">Luxury</option>
-                                    </select>
+                                        onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) })}
+                                        className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                                    />
+                                    <div className="flex justify-between text-xs text-stone-400 mt-2">
+                                        <span>$500</span>
+                                        <span>$10k+</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

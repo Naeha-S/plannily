@@ -8,7 +8,7 @@ interface DiscoveryData {
     interests: string[];
     companions: string;
     travelStyle: string;
-    budget: string;
+    budget: number;
     origin: string;
     startDate: string;
     endDate: string;
@@ -49,12 +49,6 @@ const TRAVEL_STYLES = [
     { id: 'packed', label: 'Packed', emoji: '🐇', desc: 'See everything possible.' },
 ];
 
-const BUDGETS = [
-    { id: 'low', label: 'Budget', emoji: '💸' },
-    { id: 'medium', label: 'Standard', emoji: '💰' },
-    { id: 'high', label: 'Luxury', emoji: '💎' },
-];
-
 export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryData) => void }) => {
     const [step, setStep] = useState(1);
     const [data, setData] = useState<DiscoveryData>({
@@ -62,7 +56,7 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
         interests: [],
         companions: '',
         travelStyle: '',
-        budget: '',
+        budget: 3000,
         origin: '',
         startDate: '',
         endDate: '',
@@ -294,22 +288,22 @@ export const DiscoveryWizard = ({ onComplete }: { onComplete: (data: DiscoveryDa
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-3">
-                                    Budget Level
+                                    Budget (per person): ${data.budget || 3000}
                                 </label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {BUDGETS.map((b) => (
-                                        <button
-                                            key={b.id}
-                                            onClick={() => setData({ ...data, budget: b.id })}
-                                            className={`p-4 rounded-xl border-2 text-center transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${data.budget === b.id
-                                                ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-md scale-[1.02]'
-                                                : 'border-slate-100 hover:border-slate-300 hover:shadow-sm hover:-translate-y-0.5'
-                                                }`}
-                                        >
-                                            <div className="text-2xl mb-1">{b.emoji}</div>
-                                            <div className="font-medium">{b.label}</div>
-                                        </button>
-                                    ))}
+                                <div className="relative pt-2">
+                                    <input
+                                        type="range"
+                                        min="500"
+                                        max="10000"
+                                        step="100"
+                                        value={typeof data.budget === 'number' ? data.budget : 3000}
+                                        onChange={(e) => setData({ ...data, budget: parseInt(e.target.value) })}
+                                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                                    />
+                                    <div className="flex justify-between text-xs text-slate-400 mt-2">
+                                        <span>$500</span>
+                                        <span>$10k+</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

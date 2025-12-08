@@ -1,35 +1,82 @@
-import { HuggingFaceService } from './huggingface';
 import { GeminiService } from './gemini';
 import { getUnsplashImage } from './unsplash';
 
-// Generic generator using HuggingFace (Llama) - replaced DeepSeek due to CORS
-const generateWithLlama = async (prompt: string) => {
-  try {
-    return await HuggingFaceService.generate(prompt);
-  } catch (error) {
-    console.error('Llama generation failed:', error);
-    throw new Error('Failed to generate content via Llama');
-  }
-};
+import { OpenAIService } from './openai';
 
-// Generic generator using Gemini
-const generateWithGemini = async (prompt: string) => {
+// Smart Fallback Generator: Gemini -> OpenAI
+const generateSmartAI = async (prompt: string) => {
+  // 1. Try Gemini
   try {
     return await GeminiService.generate(prompt);
-  } catch (error) {
-    console.error('Gemini generation failed:', error);
-    throw new Error('Failed to generate content via Gemini');
+  } catch (geminiError) {
+    console.warn('Gemini failed, switching to OpenAI 🟢', geminiError);
+
+    // 2. Try OpenAI
+    try {
+      return await OpenAIService.generate(prompt);
+    } catch (openAIError) {
+      console.error('All AI models failed 🔴', openAIError);
+      throw new Error('All AI services are currently unavailable. Please check your connection or API keys.');
+    }
   }
 };
 
+const extractJson = (text: string) => {
+  try {
+    // Try parsing assuming it's clean
+    return JSON.parse(text);
+  } catch (e) {
+    // Try finding JSON block
+    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (jsonMatch) {
+      try {
+        let cleanMatch = jsonMatch[0];
+        // Attempt to fix common standard json issues if parse fails
+        // Remove trailing commas
+        cleanMatch = cleanMatch.replace(/,\s*([\]}])/g, '$1');
+        return JSON.parse(cleanMatch);
+      } catch (e2) {
+        console.error('Failed to parse extracted JSON:', e2);
+      }
+    }
+    // Fallback: simple cleanup
+    let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Remove potential comments
+    cleanText = cleanText.replace(/\/\/.*$/gm, '');
+    try {
+      return JSON.parse(cleanText);
+    } catch (e3) {
+      // Last ditch effort: relaxed json parse (e.g. using Function, unsafe but usually ok for AI output in this context if careful)
+      // Or just fail. Let's try to remove control chars.
+      cleanText = cleanText.replace(/[\u0000-\u0019]+/g, "");
+      try {
+        return JSON.parse(cleanText);
+      } catch (e4) {
+        console.error('Final JSON parse attempt failed:', e4);
+        throw new Error('Failed to parse AI response');
+      }
+    }
+  }
+};
+
+import { STANDARD_DESTINATIONS } from '../data/standardDestinations';
+
 export const generateDestinations = async (preferences: any) => {
+  const nationalityClause = preferences.nationality
+    ? `User Nationality: ${preferences.nationality}. IMPORTANT: Prioritize destinations that are VISA-FREE or have EASY VISA access for this nationality.`
+    : '';
+
   const prompt = `
-    Suggest 3 destinations + 2 alternatives based on:
+    Suggest 15 personalized travel destinations based on:
     Vibes: ${preferences.vibes.join(', ')}
     Companions: ${preferences.companions}
-    Budget: ${preferences.budget}
+    Budget: ${preferences.budget} (User's approx max budget/person)
     Duration: ${preferences.duration} days
     Origin: ${preferences.origin}
+    ${nationalityClause}
+
+    Make sure the 15 suggestions are diverse, covering different types of trips fitting the vibes.
+    Provide an ACCURATE cost estimate (including flight) based on the Origin.
 
     Return strictly valid JSON (no markdown, no backticks):
     {
@@ -38,29 +85,40 @@ export const generateDestinations = async (preferences: any) => {
           "id": "unique_string",
           "name": "City, Country",
           "country": "Country Name",
-          "description": "1 sentence reason.",
+          "countryCode": "ISO 2-letter code (e.g. US, FR, JP)",
+          "description": "1 sentence reason matching user vibe.",
           "imageQuery": "Simple 2-3 word search term for Unsplash (e.g. 'Paris Eiffel')",
-          "matchScore": number (0-100),
+          "matchScore": number (60-100),
           "tags": ["tag1", "tag2", "tag3"],
           "weather": { "temp": number, "condition": "String" },
-          "costEstimate": number
+          "costEstimate": number,
+          "visaInfo": "Short note on visa (e.g. 'Visa-free' or 'E-Visa needed')"
         }
       ]
     }
   `;
 
   try {
-    const text = await generateWithLlama(prompt);
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const data = JSON.parse(cleanText);
+    const text = await generateSmartAI(prompt);
+    const data = extractJson(text);
 
-    // Hydrate with Unsplash images
-    const destinationsWithImages = await Promise.all(data.destinations.map(async (dest: any) => ({
+    // 1. Hydrate AI results with Unsplash images
+    const aiDestinations = await Promise.all(data.destinations.map(async (dest: any) => ({
       ...dest,
       imageUrl: await getUnsplashImage(dest.imageQuery || dest.name)
     })));
 
-    return { destinations: destinationsWithImages };
+    // 2. Hydrate Standard Destinations with Unsplash images (if not already simulated or cached)
+    // We can simulate or fetch. To be safe, let's fetch real images for them too or use placeholders?
+    // Let's assume we fetch them once or lazily. For now, fetch.
+    const standardDestinations = await Promise.all(STANDARD_DESTINATIONS.map(async (std: any) => ({
+      ...std,
+      imageUrl: await getUnsplashImage(std.imageQuery || std.name),
+      isStandard: true // flag to differentiate in UI if needed
+    })));
+
+    // 3. Combine: 15 AI + 15 Standard
+    return { destinations: [...aiDestinations, ...standardDestinations] };
   } catch (error) {
     console.error('Error generating destinations:', error);
     throw error;
@@ -104,6 +162,7 @@ export const generateItinerary = async (request: any) => {
     Return strictly valid JSON (no markdown):
     {
       "destination": "${request.destination}",
+      "countryCode": "ISO 2-letter code",
       "events": [
         {
           "id": "evt_1",
@@ -140,9 +199,8 @@ export const generateItinerary = async (request: any) => {
   `;
 
   try {
-    const text = await generateWithGemini(prompt);
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const data = JSON.parse(cleanText);
+    const text = await generateSmartAI(prompt);
+    const data = extractJson(text);
 
     // Hydrate Events with Images
     if (data.events) {
@@ -187,9 +245,8 @@ export const regenerateDay = async (currentItinerary: any, dayIndex: number) => 
     `;
 
   try {
-    const text = await generateWithGemini(prompt);
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const newDay = JSON.parse(cleanText);
+    const text = await generateSmartAI(prompt);
+    const newDay = extractJson(text);
 
     // Hydrate images
     newDay.activities = await Promise.all(newDay.activities.map(async (act: any) => ({
@@ -224,9 +281,8 @@ export const generateMoreEvents = async (destination: string, date: string) => {
     `;
 
   try {
-    const text = await generateWithLlama(prompt);
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const events = JSON.parse(cleanText);
+    const text = await generateSmartAI(prompt);
+    const events = extractJson(text);
 
     // Hydrate with images
     const eventsWithImages = await Promise.all(events.map(async (evt: any) => ({
@@ -280,11 +336,9 @@ export const findLocalPlaces = async (city: string, context?: { savedTrip?: any 
     `;
 
   try {
-    const text = await generateWithLlama(prompt);
+    const text = await generateSmartAI(prompt);
     // Robust JSON cleanup
-    const jsonMatch = text.match(/\[[\s\S]*\]/); // Look for the array bracket structure
-    const cleanText = jsonMatch ? jsonMatch[0] : text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const places = JSON.parse(cleanText);
+    const places = extractJson(text);
 
     // Hydrate with images
     const placesWithImages = await Promise.all(places.map(async (place: any) => ({
@@ -314,7 +368,7 @@ export const chatWithAI = async (message: string, context: any) => {
   `;
 
   try {
-    return await generateWithLlama(prompt);
+    return await generateSmartAI(prompt);
   } catch (error) {
     console.error('Error in chat:', error);
     throw error;

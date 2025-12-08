@@ -1,15 +1,31 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Cloud, DollarSign, Users } from 'lucide-react';
+import { Cloud, DollarSign, Users, Info, Calendar, AlertTriangle } from 'lucide-react';
 import { Button } from '../common/Button';
 import type { Destination } from '../../types';
+import { checkHolidaysForDateRange, type PublicHoliday } from '../../services/holidays';
 
 interface DestinationCardProps {
     destination: Destination;
     rank: number;
     onSelect: (id: string) => void;
+    startDate?: string;
 }
 
-export const DestinationCard = ({ destination, rank, onSelect }: DestinationCardProps) => {
+export const DestinationCard = ({ destination, rank, onSelect, startDate }: DestinationCardProps) => {
+    const [showInfo, setShowInfo] = useState(false);
+    const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
+    const [loadingHolidays, setLoadingHolidays] = useState(false);
+
+    useEffect(() => {
+        if (showInfo && startDate && destination.countryCode && holidays.length === 0) {
+            setLoadingHolidays(true);
+            checkHolidaysForDateRange(destination.countryCode, startDate, 7) // Checking for first 7 days
+                .then(setHolidays)
+                .catch(err => console.error(err))
+                .finally(() => setLoadingHolidays(false));
+        }
+    }, [showInfo, startDate, destination.countryCode]);
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -71,10 +87,57 @@ export const DestinationCard = ({ destination, rank, onSelect }: DestinationCard
                     ))}
                 </div>
 
+                {/* Info Toggle */}
+                <button
+                    onClick={() => setShowInfo(!showInfo)}
+                    className="flex items-center text-sm text-[var(--color-primary)] font-medium mb-4 hover:underline"
+                >
+                    <Info className="w-4 h-4 mr-1" />
+                    {showInfo ? 'Hide Details' : 'View Travel Info (Visa & Holidays)'}
+                </button>
+
+                {showInfo && (
+                    <div className="mb-4 p-4 bg-stone-50 rounded-xl space-y-3 animate-in slide-in-from-top-2">
+                        {/* Visa Info */}
+                        {destination.visaInfo && (
+                            <div className="text-sm">
+                                <span className="font-semibold block text-stone-700">🛂 Visa Check:</span>
+                                <span className="text-stone-600">{destination.visaInfo}</span>
+                            </div>
+                        )}
+
+                        {/* Holidays */}
+                        <div className="text-sm">
+                            <span className="font-semibold block text-stone-700 mb-1">📅 Public Holidays:</span>
+                            {!startDate ? (
+                                <span className="text-stone-400 italic">Select dates to check holidays.</span>
+                            ) : loadingHolidays ? (
+                                <span className="text-stone-500">Checking local calendar...</span>
+                            ) : holidays.length > 0 ? (
+                                <div className="space-y-1">
+                                    <div className="flex items-center text-amber-600 font-medium">
+                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                        <span>Heads up! Holidays found:</span>
+                                    </div>
+                                    <ul className="list-disc list-inside text-stone-600 pl-1">
+                                        {holidays.map(h => (
+                                            <li key={h.uuid || h.name}>{h.date}: {h.name}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <span className="text-green-600 flex items-center">
+                                    <Calendar className="w-3 h-3 mr-1" /> No public holidays during your trip.
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <Button className="w-full" onClick={() => onSelect(destination.id)}>
                     View Itinerary
                 </Button>
             </div>
-        </motion.div>
+        </motion.div >
     );
 };

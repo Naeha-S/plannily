@@ -6,6 +6,7 @@ import type { Destination } from '../types';
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { generateDestinations } from '../services/ai';
+import { supabase, getProfile } from '../services/supabase';
 
 const DiscoverPage = () => {
     const navigate = useNavigate();
@@ -19,8 +20,20 @@ const DiscoverPage = () => {
         setLoading(true);
         setError('');
         setDiscoveryData(data);
+        setDiscoveryData(data);
         try {
-            const result = await generateDestinations(data);
+            // Fetch profile to get nationality if available
+            let userNationality = '';
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const profile = await getProfile(user.id);
+                if (profile?.country_of_origin) {
+                    userNationality = profile.country_of_origin;
+                }
+            }
+
+            const enrichData = { ...data, nationality: userNationality };
+            const result = await generateDestinations(enrichData);
             if (result && result.destinations) {
                 setDestinations(result.destinations);
                 setShowResults(true);
@@ -103,6 +116,7 @@ const DiscoverPage = () => {
                             destination={dest}
                             rank={index + 1}
                             onSelect={handleSelectDestination}
+                            startDate={discoveryData?.startDate}
                         />
                     ))}
                 </div>

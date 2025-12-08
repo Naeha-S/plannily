@@ -8,6 +8,7 @@ export interface Destination {
     id: string;
     name: string;
     country: string;
+    countryCode?: string;
     description: string;
     imageUrl: string;
     matchScore: number;
@@ -17,6 +18,7 @@ export interface Destination {
         condition: string;
     };
     costEstimate: number;
+    visaInfo?: string;
 }
 
 export interface Activity {

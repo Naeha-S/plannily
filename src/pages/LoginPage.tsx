@@ -14,6 +14,14 @@ const LoginPage = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const navigate = useNavigate();
 
+    // Signup specific state
+    const [interests, setInterests] = useState<string[]>([]);
+    const INTEREST_OPTIONS = ['History', 'Art', 'Food', 'Nature', 'Adventure', 'Relaxation', 'Nightlife', 'Shopping'];
+
+    const toggleInterest = (interest: string) => {
+        setInterests(prev => prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]);
+    };
+
     const validateForm = () => {
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             setError('Please enter a valid email address.');
@@ -47,6 +55,13 @@ const LoginPage = () => {
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
+                    options: {
+                        data: {
+                            travel_preferences: {
+                                interests: interests
+                            }
+                        }
+                    }
                 });
                 if (error) throw error;
                 setSuccessMsg('Account created! Please check your email to confirm.');
@@ -68,34 +83,34 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 px-4 py-12">
+        <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4 py-12 transition-colors duration-300">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
-                className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-stone-100"
+                className="max-w-md w-full bg-[var(--color-surface)] rounded-3xl shadow-xl overflow-hidden border border-[var(--color-border)]"
             >
                 <div className="p-8 md:p-10">
                     <div className="text-center mb-8">
                         <h2 className="text-3xl font-bold text-[var(--color-text)] font-serif mb-2">
                             {isLogin ? 'Welcome Back' : 'Create Account'}
                         </h2>
-                        <p className="text-stone-500">
+                        <p className="text-[var(--color-text-muted)]">
                             {isLogin ? 'Enter your details to access your trips.' : 'Start your journey with Plannily today.'}
                         </p>
                     </div>
 
                     <form onSubmit={handleAuth} className="space-y-5">
                         <div className="space-y-1">
-                            <label className="block text-sm font-medium text-stone-700 ml-1">Email Address</label>
+                            <label className="block text-sm font-medium text-[var(--color-text)] ml-1">Email Address</label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
+                                <Mail className="absolute left-4 top-3.5 w-5 h-5 text-[var(--color-text-muted)] group-focus-within:text-[var(--color-primary)] transition-colors" />
                                 <motion.input
                                     whileFocus={{ scale: 1.01 }}
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 outline-none transition-all bg-stone-50 focus:bg-white"
+                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 outline-none transition-all bg-[var(--color-input)] text-[var(--color-text)]"
                                     placeholder="you@example.com"
                                     disabled={loading}
                                 />
@@ -103,21 +118,42 @@ const LoginPage = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label className="block text-sm font-medium text-stone-700 ml-1">Password</label>
+                            <label className="block text-sm font-medium text-[var(--color-text)] ml-1">Password</label>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-stone-400 group-focus-within:text-[var(--color-primary)] transition-colors" />
+                                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-[var(--color-text-muted)] group-focus-within:text-[var(--color-primary)] transition-colors" />
                                 <motion.input
                                     whileFocus={{ scale: 1.01 }}
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 outline-none transition-all bg-stone-50 focus:bg-white"
+                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/10 outline-none transition-all bg-[var(--color-input)] text-[var(--color-text)]"
                                     placeholder="••••••••"
                                     disabled={loading}
                                 />
                             </div>
                             {!isLogin && (
-                                <p className="text-xs text-stone-400 ml-1">Must be at least 6 characters</p>
+                                <>
+                                    <p className="text-xs text-[var(--color-text-muted)] ml-1">Must be at least 6 characters</p>
+
+                                    <div className="mt-4 space-y-2">
+                                        <label className="block text-sm font-medium text-[var(--color-text)] ml-1">Tell us what you love (Interests)</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {INTEREST_OPTIONS.map(interest => (
+                                                <button
+                                                    key={interest}
+                                                    type="button"
+                                                    onClick={() => toggleInterest(interest)}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${interests.includes(interest)
+                                                            ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
+                                                            : 'bg-[var(--color-background)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-primary)]'
+                                                        }`}
+                                                >
+                                                    {interest}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
                             )}
                         </div>
 
@@ -160,8 +196,8 @@ const LoginPage = () => {
                         </motion.div>
                     </form>
 
-                    <div className="mt-8 pt-6 border-t border-stone-100 text-center">
-                        <p className="text-stone-500 text-sm">
+                    <div className="mt-8 pt-6 border-t border-[var(--color-border)] text-center">
+                        <p className="text-[var(--color-text-muted)] text-sm">
                             {isLogin ? "Don't have an account?" : "Already have an account?"}
                             <button
                                 onClick={() => {

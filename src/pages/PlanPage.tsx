@@ -4,18 +4,20 @@ import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
 import { Sparkles, AlertCircle, Plane, Save } from 'lucide-react';
 import { generateItinerary, regenerateDay, generateMoreEvents } from '../services/ai';
-import { searchFlights } from '../services/amadeus';
+import { checkHolidaysForDateRange } from '../services/holidays';
 import { Button } from '../components/common/Button';
 import { supabase, saveItinerary, getProfile } from '../services/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const PlanPage = () => {
     const [planData, setPlanData] = useState<any>(null);
+    const [requestData, setRequestData] = useState<any>(null);
     const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [flightStatus, setFlightStatus] = useState<string>('');
     const [saving, setSaving] = useState(false);
+    const [holidays, setHolidays] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const navigate = useNavigate();
@@ -61,31 +63,29 @@ const PlanPage = () => {
         }
     }, [location.state, hasAutoPlanned]);
 
+    // Check holidays when planData changes
+    useEffect(() => {
+        if (planData && planData.countryCode && requestData?.startDate && requestData?.days) {
+            checkHolidaysForDateRange(planData.countryCode, requestData.startDate, requestData.days)
+                .then(setHolidays)
+                .catch(err => console.error('Error checking holidays:', err));
+        }
+    }, [planData, requestData]);
+
     const handlePlan = async (data: any) => {
+        setRequestData(data); // Save context
         setLoading(true);
         setError('');
         setFlightStatus('Searching for flights...');
 
         try {
-            // 1. Search for flights (only if origin is provided)
-            let flightData = null;
-            if (data.origin) {
-                const today = new Date().toISOString().split('T')[0];
-                try {
-                    flightData = await searchFlights(data.origin, data.destination, today);
-                    setFlightStatus('Flights found! Generating itinerary...');
-                } catch (flightError) {
-                    console.warn('Flight search failed, proceeding with itinerary only:', flightError);
-                    setFlightStatus('Flight search unavailable. Generating itinerary...');
-                }
-            } else {
-                setFlightStatus('Generating itinerary...');
-            }
+            // 1. Flight search skipped per user request
+            setFlightStatus('Generating itinerary...');
 
             // 2. Generate Itinerary (passing flight info context if available)
             const aiRequest = {
                 ...data,
-                flightContext: flightData ? JSON.stringify(flightData.data?.slice(0, 3)) : 'No flight data available',
+                flightContext: 'Flight search disabled',
                 userProfile: profile // Pass profile data to AI
             };
 
@@ -232,6 +232,24 @@ const PlanPage = () => {
                         {saving ? 'Saving...' : 'Save Trip'}
                     </Button>
                 </div>
+
+                {holidays.length > 0 && (
+                    <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+                        <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
+                            <AlertCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-amber-900">Public Holidays During Your Trip</h3>
+                            <p className="text-sm text-amber-700 mb-2">Some shops or attractions might have different hours.</p>
+                            <ul className="text-sm text-amber-800 list-disc list-inside">
+                                {holidays.map((h, i) => (
+                                    <li key={i}><span className="font-semibold">{h.date}</span>: {h.name}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
                 <ItineraryView
                     destination={planData.destination}
                     days={itinerary}

@@ -16,8 +16,7 @@ export const getUnsplashImage = async (query: string): Promise<string> => {
             return data.image_url;
         }
     } catch (_) {
-        // Ignore cache errors and proceed to fetch
-        console.warn('Cache check failed');
+        // Ignore cache errors (table might not exist, etc) and proceed to fetch
     }
 
     if (!UNSPLASH_ACCESS_KEY) {
