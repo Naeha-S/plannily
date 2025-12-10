@@ -52,9 +52,14 @@ const Navbar = () => {
                         {t('local_guide')}
                     </Link>
                     {user && (
-                        <Link to="/saved" className="text-sm font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors">
-                            {t('saved_trips')}
-                        </Link>
+                        <>
+                            <Link to="/saved" className="text-sm font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors">
+                                {t('saved_trips')}
+                            </Link>
+                            <Link to="/dashboard" className="text-sm font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors">
+                                Dashboard
+                            </Link>
+                        </>
                     )}
                 </div>
 

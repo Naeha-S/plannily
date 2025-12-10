@@ -539,7 +539,31 @@ const LandingPage = () => {
                 </div>
             </section>
 
-            {/* REMOVED EXTRA FEATURES SECTION */}
+            {/* TRAVEL COMMAND CENTER (NEW SECTION) */}
+            <section className="relative py-32 bg-white z-20 overflow-hidden text-center">
+                <div className="container mx-auto px-6 max-w-5xl">
+                    <span className="text-[var(--color-primary)] font-bold tracking-widest uppercase text-xs">Unified Travel OS</span>
+                    <h2 className="font-serif text-5xl md:text-6xl text-stone-900 mt-4 mb-8 leading-tight">
+                        Your Trip, <br />
+                        <span className="italic text-stone-400">Under Control.</span>
+                    </h2>
+                    <p className="text-lg text-stone-500 max-w-2xl mx-auto mb-12">
+                        One dashboard for everything. Track your budget, check daily vibes, get smart weather alerts, and manage your itinerary. No more chaotic app switching.
+                    </p>
+
+                    <div className="relative group cursor-pointer inline-block" onClick={() => handleAction('/dashboard')}>
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
+                        <div className="relative bg-white border border-stone-200 rounded-3xl p-2 shadow-2xl">
+                            <img src="https://images.unsplash.com/photo-1484417894907-623942c8ee29?q=80&w=1000&auto=format&fit=crop" alt="Dashboard Preview" className="rounded-2xl w-full max-w-4xl h-auto" />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/5 transition-colors rounded-2xl group-hover:block hidden">
+                                <div className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full font-bold text-stone-900 shadow-lg">
+                                    Open Command Center
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* FOOTER */}
             <footer className="bg-stone-950 text-stone-500 py-16 z-20 relative">

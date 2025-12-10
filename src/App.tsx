@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RootLayout from './layouts/RootLayout';
 import LandingPage from './pages/LandingPage';
+import DashboardPage from './pages/DashboardPage';
 import DiscoverPage from './pages/DiscoverPage';
 import PlanPage from './pages/PlanPage';
 import FlightsPage from './pages/FlightsPage';
@@ -33,6 +34,7 @@ function App() {
               <Route path="privacy" element={<PrivacyPage />} />
               <Route path="terms" element={<TermsPage />} />
               <Route path="contact" element={<ContactPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
             </Route>
           </Routes>
           <Analytics />
