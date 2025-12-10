@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { PlannerInput } from '../components/planner/PlannerInput';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
-import { Sparkles, AlertCircle, Plane, Save } from 'lucide-react';
+import { Sparkles, AlertCircle, Plane, Save, RefreshCw } from 'lucide-react';
 import { generateItinerary, regenerateDay, generateMoreEvents } from '../services/ai';
-import { checkHolidaysForDateRange } from '../services/holidays';
+// import { checkHolidaysForDateRange } from '../services/holidays'; // Disabled per user
+import { getExchangeRate, type ExchangeRate } from '../services/currency';
 import { Button } from '../components/common/Button';
 import { supabase, saveItinerary, getProfile } from '../services/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -17,7 +18,8 @@ const PlanPage = () => {
     const [error, setError] = useState('');
     const [flightStatus, setFlightStatus] = useState<string>('');
     const [saving, setSaving] = useState(false);
-    const [holidays, setHolidays] = useState<any[]>([]);
+    // const [holidays, setHolidays] = useState<any[]>([]);
+    const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const navigate = useNavigate();
@@ -63,14 +65,29 @@ const PlanPage = () => {
         }
     }, [location.state, hasAutoPlanned]);
 
-    // Check holidays when planData changes
+    // Check holidays when planData changes - DISABLED
+    // useEffect(() => {
+    //    if (planData && planData.countryCode && requestData?.startDate && requestData?.days) {
+    //        checkHolidaysForDateRange(planData.countryCode, requestData.startDate, requestData.days)
+    //            .then(setHolidays)
+    //            .catch(err => console.error('Error checking holidays:', err));
+    //    }
+    // }, [planData, requestData]);
+
+    // Check Currency
     useEffect(() => {
-        if (planData && planData.countryCode && requestData?.startDate && requestData?.days) {
-            checkHolidaysForDateRange(planData.countryCode, requestData.startDate, requestData.days)
-                .then(setHolidays)
-                .catch(err => console.error('Error checking holidays:', err));
+        if (planData && planData.suggestedCurrency) {
+            // Determine Origin Currency. Default to USD if unknown.
+            // If user has 'origin' in requestData (airport code), mapping is hard.
+            // Let's assume USD default or try to infer. AI could guess userCurrency but not implemented.
+            // Simplest: USD -> Target.
+            const base = 'USD';
+
+            getExchangeRate(planData.suggestedCurrency, base)
+                .then(setExchangeRate)
+                .catch(err => console.error('Currency check failed', err));
         }
-    }, [planData, requestData]);
+    }, [planData]);
 
     const handlePlan = async (data: any) => {
         setRequestData(data); // Save context
@@ -233,19 +250,21 @@ const PlanPage = () => {
                     </Button>
                 </div>
 
-                {holidays.length > 0 && (
-                    <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
-                        <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
-                            <AlertCircle className="w-5 h-5" />
+                {exchangeRate && (
+                    <div className="mb-8 p-6 bg-emerald-50 border border-emerald-100 rounded-3xl flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-emerald-100 p-3 rounded-full text-emerald-600">
+                                <RefreshCw className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-emerald-900 text-lg">Currency Exchange</h3>
+                                <p className="text-sm text-emerald-700">
+                                    1 {exchangeRate.base} ≈ <span className="font-bold text-xl">{exchangeRate.rate.toFixed(2)} {exchangeRate.target}</span>
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="font-bold text-amber-900">Public Holidays During Your Trip</h3>
-                            <p className="text-sm text-amber-700 mb-2">Some shops or attractions might have different hours.</p>
-                            <ul className="text-sm text-amber-800 list-disc list-inside">
-                                {holidays.map((h, i) => (
-                                    <li key={i}><span className="font-semibold">{h.date}</span>: {h.name}</li>
-                                ))}
-                            </ul>
+                        <div className="text-right hidden sm:block">
+                            <p className="text-xs text-emerald-600/60">Live rates via CurrencyAPI</p>
                         </div>
                     </div>
                 )}

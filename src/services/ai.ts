@@ -163,6 +163,7 @@ export const generateItinerary = async (request: any) => {
     {
       "destination": "${request.destination}",
       "countryCode": "ISO 2-letter code",
+      "suggestedCurrency": "Currency Code (e.g. JPY, EUR)",
       "events": [
         {
           "id": "evt_1",
