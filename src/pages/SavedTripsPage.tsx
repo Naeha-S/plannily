@@ -66,8 +66,6 @@ const SavedTripsPage = () => {
                 <ItineraryView
                     destination={selectedTrip.destination}
                     days={selectedTrip.data.days}
-                    events={selectedTrip.data.events}
-                    onEdit={() => { }}
                 />
             </div>
         );

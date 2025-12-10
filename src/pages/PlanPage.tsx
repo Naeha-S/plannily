@@ -3,7 +3,7 @@ import { PlannerInput } from '../components/planner/PlannerInput';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
 import { Sparkles, AlertCircle, Plane, Save, RefreshCw } from 'lucide-react';
-import { generateItinerary, regenerateDay, generateMoreEvents, replaceActivity } from '../services/ai';
+import { generateItinerary, replaceActivity } from '../services/ai';
 // import { checkHolidaysForDateRange } from '../services/holidays'; // Disabled per user
 import { getExchangeRate, type ExchangeRate } from '../services/currency';
 import { Button } from '../components/common/Button';
@@ -12,7 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 const PlanPage = () => {
     const [planData, setPlanData] = useState<any>(null);
-    const [requestData, setRequestData] = useState<any>(null);
+    const [, setRequestData] = useState<any>(null);
     const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -122,69 +122,7 @@ const PlanPage = () => {
         }
     };
 
-    const handleRegenerateDay = async (dayIndex: number) => {
-        if (!planData) return;
 
-        setLoading(true);
-
-        try {
-            const newDay = await regenerateDay(planData, dayIndex);
-
-            const newDays = [...itinerary];
-            newDays[dayIndex] = newDay;
-
-            setItinerary(newDays);
-            setPlanData({ ...planData, days: newDays });
-        } catch (err) {
-            console.error('Failed to regenerate day', err);
-            alert('Failed to regenerate day. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleLoadMoreEvents = async () => {
-        if (!planData) return;
-        setLoading(true);
-        try {
-            // Use the first day's date or a default
-            const date = planData.days[0]?.date || new Date().toISOString().split('T')[0];
-            const newEvents = await generateMoreEvents(planData.destination, date);
-
-            setPlanData((prev: any) => ({
-                ...prev,
-                events: [...(prev.events || []), ...newEvents]
-            }));
-        } catch (err) {
-            console.error('Failed to load more events', err);
-            alert('Failed to load more events.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleAddEvent = (event: any, dayIndex: number) => {
-        const newDays = [...itinerary];
-        const day = newDays[dayIndex];
-
-        // Create a new activity from the event
-        const newActivity = {
-            id: `evt-${Date.now()}`,
-            name: event.name,
-            type: event.type,
-            startTime: '18:00', // Default time
-            endTime: '20:00',
-            description: event.description,
-            location: event.location,
-            cost: 0,
-            imageUrl: event.imageUrl
-        };
-
-        day.activities.push(newActivity);
-        setItinerary(newDays);
-        setPlanData({ ...planData, days: newDays });
-        alert(`Added ${event.name} to Day ${day.day}`);
-    };
 
     const handleReplaceActivity = async (activityId: string, dayIndex: number) => {
         if (!planData) return;
@@ -308,11 +246,6 @@ const PlanPage = () => {
                 <ItineraryView
                     destination={planData.destination}
                     days={itinerary}
-                    events={planData.events}
-                    onEdit={() => console.log('Edit')}
-                    onRegenerateDay={handleRegenerateDay}
-                    onLoadMoreEvents={handleLoadMoreEvents}
-                    onAddEvent={handleAddEvent}
                     onReplaceActivity={handleReplaceActivity}
                 />
             </div>

@@ -15,7 +15,15 @@ import {
     Droplets,
     ArrowRight,
     Check,
-    CreditCard
+    CreditCard,
+    Scale,
+    Globe,
+    ShieldAlert,
+    Coins,
+    Info,
+    Shirt,
+    Utensils,
+    Volume2
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { ItineraryView } from '../components/planner/ItineraryView';
@@ -77,6 +85,20 @@ const DashboardPage = () => {
         { id: 'golden', title: "Golden Hour", desc: "Perfect light at 4:30 PM", icon: Sun, color: "text-orange-500", border: 'border-l-orange-400' },
         { id: 'activity', title: "High Activity", desc: "15k steps projected tomorrow", icon: Activity, color: "text-blue-500", border: 'border-l-blue-400' }
     ]);
+
+    // Data for new features (Mock for Tokyo context)
+    const fairPrices = [
+        { item: "Coffee (Latte)", price: "¥450 - ¥600", icon: Coffee },
+        { item: "Taxi Start", price: "¥500", icon: Activity }, // Activity as generic car/motion
+        { item: "Ramen Meal", price: "¥800 - ¥1200", icon: Utensils },
+        { item: "Water (Bottle)", price: "¥110 - ¥150", icon: Droplets },
+    ];
+
+    const cultureTips = [
+        { id: 'tip', title: "No Tipping", desc: "Service is included. Tipping is considered rude/confusing.", icon: Coins, color: 'text-red-500' },
+        { id: 'quiet', title: "Quiet Trains", desc: "Silence phones. Talking loudly is frowned upon.", icon: Volume2, color: 'text-blue-500' }, // Need Volume icon or similar
+        { id: 'shoes', title: "Shoes Off", desc: "Remove shoes at homes, ryokans, and some izakayas.", icon: Shirt, color: 'text-amber-500' },
+    ];
 
     // Initialize Trip Data
     useEffect(() => {
@@ -296,6 +318,34 @@ const DashboardPage = () => {
                             </div>
                         </div>
 
+                        {/* Fair Price Index Widget */}
+                        <motion.div
+                            whileHover={{ y: -4 }}
+                            className="bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]"
+                        >
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                                    <Scale size={12} /> Fair Price Index
+                                </span>
+                                <Info size={12} className="text-stone-300" />
+                            </div>
+                            <div className="space-y-3">
+                                {fairPrices.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-sm border-b border-stone-100 last:border-0 pb-2 last:pb-0">
+                                        <div className="flex items-center gap-3 text-stone-600 font-medium">
+                                            <div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center text-stone-400">
+                                                <item.icon size={12} />
+                                            </div>
+                                            {item.item}
+                                        </div>
+                                        <div className="text-stone-800 font-bold font-mono">
+                                            {item.price}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+
                     </div>
 
 
@@ -346,6 +396,33 @@ const DashboardPage = () => {
                                     );
                                 })}
                             </div>
+                        </div>
+
+                        {/* Culture Lens Widget */}
+                        <div className="bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                            <h3 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Globe size={12} /> Culture Lens
+                            </h3>
+                            <div className="space-y-3">
+                                {cultureTips.map((tip) => (
+                                    <motion.div
+                                        whileHover={{ scale: 1.02 }}
+                                        key={tip.id}
+                                        className="bg-white/50 p-3 rounded-2xl border border-stone-100 hover:border-indigo-100 transition-colors cursor-help"
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <tip.icon size={14} className={tip.color} />
+                                            <span className="text-xs font-bold text-stone-800">{tip.title}</span>
+                                        </div>
+                                        <p className="text-[10px] text-stone-500 leading-tight pl-6">
+                                            {tip.desc}
+                                        </p>
+                                    </motion.div>
+                                ))}
+                            </div>
+                            <Button variant="ghost" className="w-full mt-2 text-[10px] text-stone-400 hover:text-indigo-500">
+                                <ShieldAlert size={12} className="mr-2" /> View Scam Alerts
+                            </Button>
                         </div>
 
                         {/* Smart Alerts */}
