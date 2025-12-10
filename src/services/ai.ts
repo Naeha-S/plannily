@@ -375,3 +375,44 @@ export const chatWithAI = async (message: string, context: any) => {
     throw error;
   }
 };
+
+export const replaceActivity = async (currentActivity: any, dayActivities: any[], destination: string) => {
+  const existingNames = dayActivities.map(a => a.name).join(', ');
+  const prompt = `
+    I need an alternative to this activity: "${currentActivity.name}" (${currentActivity.type}) in ${destination}.
+    Current schedule context: ${existingNames}.
+    
+    Find ONE single activity to replace it.
+    Constraint: It MUST NOT be one of the existing activities: ${existingNames}.
+    Constraint: It should fit the same time slot (${currentActivity.startTime} - ${currentActivity.endTime}).
+    Constraint: Provide a unique, interesting alternative fitting the vibe.
+    
+    Return strictly valid JSON for a single Activity object:
+    {
+       "id": "new_unique_id",
+       "name": "Activity Name",
+       "type": "sightseeing|food|relaxation|travel|activity",
+       "startTime": "${currentActivity.startTime}",
+       "endTime": "${currentActivity.endTime}",
+       "description": "Engaging description.",
+       "location": "Address or Area",
+       "cost": number,
+       "travelTime": "15 mins",
+       "travelCost": number,
+       "imageQuery": "Search term"
+    }
+  `;
+
+  try {
+    const text = await generateSmartAI(prompt);
+    const newActivity = extractJson(text);
+
+    // Hydrate image
+    newActivity.imageUrl = await getUnsplashImage(newActivity.imageQuery || newActivity.name + ' ' + destination);
+
+    return newActivity;
+  } catch (error) {
+    console.error('Error replacing activity:', error);
+    throw error;
+  }
+};

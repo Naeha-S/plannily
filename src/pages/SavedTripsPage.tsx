@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, ArrowRight, Calendar, Loader2 } from 'lucide-react';
+import { Briefcase, ArrowRight, Calendar, Loader2, Play } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { supabase, getItineraries } from '../services/supabase';
 import { ItineraryView } from '../components/planner/ItineraryView';
@@ -48,6 +48,21 @@ const SavedTripsPage = () => {
                 <Button variant="outline" onClick={() => setSelectedTrip(null)} className="mb-6">
                     <ArrowRight className="rotate-180 mr-2 h-4 w-4" /> Back to Trips
                 </Button>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-3xl font-serif font-bold">{selectedTrip.destination}</h2>
+                    <Button
+                        className="bg-stone-900 text-white hover:bg-black"
+                        onClick={() => navigate('/dashboard', {
+                            state: {
+                                destination: selectedTrip.destination,
+                                days: selectedTrip.data.days,
+                                events: selectedTrip.data.events
+                            }
+                        })}
+                    >
+                        <Play className="w-4 h-4 mr-2 fill-current" /> Start Trip Mode
+                    </Button>
+                </div>
                 <ItineraryView
                     destination={selectedTrip.destination}
                     days={selectedTrip.data.days}
@@ -93,7 +108,24 @@ const SavedTripsPage = () => {
                                     <Calendar className="w-4 h-4 mr-2" />
                                     {new Date(trip.created_at).toLocaleDateString()}
                                 </div>
-                                <Button variant="outline" className="w-full">View Itinerary</Button>
+                                <div className="space-y-2">
+                                    <Button variant="outline" className="w-full">View Itinerary</Button>
+                                    <Button
+                                        className="w-full bg-stone-900 text-white hover:bg-black"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/dashboard', {
+                                                state: {
+                                                    destination: trip.destination,
+                                                    days: trip.data.days,
+                                                    events: trip.data.events
+                                                }
+                                            });
+                                        }}
+                                    >
+                                        <Play className="w-4 h-4 mr-2 fill-current" /> Open Dashboard
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     ))}

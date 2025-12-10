@@ -3,7 +3,7 @@ import { PlannerInput } from '../components/planner/PlannerInput';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import type { ItineraryDay } from '../types';
 import { Sparkles, AlertCircle, Plane, Save, RefreshCw } from 'lucide-react';
-import { generateItinerary, regenerateDay, generateMoreEvents } from '../services/ai';
+import { generateItinerary, regenerateDay, generateMoreEvents, replaceActivity } from '../services/ai';
 // import { checkHolidaysForDateRange } from '../services/holidays'; // Disabled per user
 import { getExchangeRate, type ExchangeRate } from '../services/currency';
 import { Button } from '../components/common/Button';
@@ -186,6 +186,42 @@ const PlanPage = () => {
         alert(`Added ${event.name} to Day ${day.day}`);
     };
 
+    const handleReplaceActivity = async (activityId: string, dayIndex: number) => {
+        if (!planData) return;
+
+        try {
+            const day = itinerary[dayIndex];
+            const activityToReplace = day.activities.find(a => a.id === activityId);
+
+            if (!activityToReplace) return;
+
+            // Optimistic Update: Could add loading state here for specific activity card
+            // But for now, let's just use global loading
+            setLoading(true);
+
+            const newActivity = await replaceActivity(activityToReplace, day.activities, planData.destination);
+
+            const newDays = [...itinerary];
+            const newDay = { ...newDays[dayIndex] };
+            // Replace the activity in the array
+            newDay.activities = newDay.activities.map(a =>
+                a.id === activityId ? { ...newActivity, id: a.id } : a // Keep original ID or use new one? Best to replace content but maybe keep ID if we want referential stability, BUT replaceActivity returns new ID. Let's use new ID but we need to ensure key props updates.
+            );
+            // Actually, replaceActivity returns a new object. Let's swap it.
+            newDay.activities = newDay.activities.map(a => a.id === activityId ? newActivity : a);
+
+            newDays[dayIndex] = newDay;
+            setItinerary(newDays);
+            setPlanData({ ...planData, days: newDays });
+
+        } catch (err) {
+            console.error('Failed to replace activity', err);
+            alert('Failed to replace activity. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSaveTrip = async () => {
         if (!user) {
             alert('Please login to save your trip!');
@@ -277,6 +313,7 @@ const PlanPage = () => {
                     onRegenerateDay={handleRegenerateDay}
                     onLoadMoreEvents={handleLoadMoreEvents}
                     onAddEvent={handleAddEvent}
+                    onReplaceActivity={handleReplaceActivity}
                 />
             </div>
         );
