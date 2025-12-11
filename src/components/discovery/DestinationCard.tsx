@@ -64,8 +64,8 @@ export const DestinationCard = ({ destination, rank, onSelect, startDate }: Dest
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="text-center p-3 bg-slate-50 rounded-xl">
                         <Cloud className="w-5 h-5 mx-auto text-slate-400 mb-1" />
-                        <div className="text-sm font-semibold">{destination.weather.temp}°C</div>
-                        <div className="text-xs text-slate-500">{destination.weather.condition}</div>
+                        <div className="text-sm font-semibold">{destination.weather?.temp ?? '--'}°C</div>
+                        <div className="text-xs text-slate-500">{destination.weather?.condition ?? 'Unknown'}</div>
                     </div>
                     <div className="text-center p-3 bg-slate-50 rounded-xl">
                         <DollarSign className="w-5 h-5 mx-auto text-slate-400 mb-1" />

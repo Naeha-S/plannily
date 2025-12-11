@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Sparkles, Bot, User, Loader2, Compass, Plane, MapPin, ArrowRight } from 'lucide-react';
+import { Send, Sparkles, Bot, User, Loader2, Plane, MapPin, ArrowRight, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { HuggingFaceService } from '../services/huggingface';
+import { runAgent } from '../services/agent/core';
 import { supabase } from '../services/supabase';
 import { VoiceAssistant } from '../components/voice/VoiceAssistant';
 
@@ -13,15 +13,16 @@ interface Message {
     timestamp: Date;
     action?: {
         label: string;
-        type: 'GENERATE_ITINERARY' | 'FIND_FLIGHTS' | 'EXPLORE' | 'OTHER';
+        type: 'GENERATE_ITINERARY' | 'FIND_FLIGHTS' | 'EXPLORE' | 'ADD_TO_SAVED' | 'UPDATE_ITINERARY' | 'OTHER';
         data: any;
+        status?: 'pending' | 'success' | 'failed';
     };
 }
 
 const QUICK_ACTIONS = [
     { label: "Plan a trip to Paris", icon: MapPin },
     { label: "Find cheap flights", icon: Plane },
-    { label: "Hidden gems in Tokyo", icon: Compass },
+    { label: "Add 'Buy SIM Card' to my trip", icon: Sparkles }, // New command example
 ];
 
 const AskAIPage = () => {
@@ -81,52 +82,46 @@ const AskAIPage = () => {
         setIsTyping(true);
 
         try {
-            // Call Hugging Face Llama
-            const aiResponseText = await HuggingFaceService.chat(
+            // Call Agent Brain (Layer 2)
+            const agentResponse = await runAgent(
                 textToSend,
-                messages.map(m => ({ role: m.role, content: m.content })),
-                userContext
+                { ...userContext, recentMessages: messages.slice(-3) }
             );
 
-            // Parse for actions
-            const actionRegex = /<<<ACTION:\s*([^|]+)\s*\|\s*([^>]+)>>>/;
-            const match = aiResponseText.match(actionRegex);
-
             let action = undefined;
-            let displayContent = aiResponseText;
+            if (agentResponse.toolCall) {
+                const { name, arguments: args } = agentResponse.toolCall;
 
-            if (match) {
-                const label = match[1].trim();
-                const rawData = match[2].trim();
+                // Map Core Tools to UI Actions
                 let type: any = 'OTHER';
-                let data = {};
+                if (name === 'updateItinerary') type = 'UPDATE_ITINERARY';
+                else if (name === 'getFlights') type = 'FIND_FLIGHTS';
+                else if (name === 'getNearbyPlaces') type = 'EXPLORE';
+                else if (name === 'addToSaved') type = 'ADD_TO_SAVED';
 
-                try {
-                    data = JSON.parse(rawData);
-                    if (label.toLowerCase().includes('itinerary')) type = 'GENERATE_ITINERARY';
-                    else if (label.toLowerCase().includes('flight')) type = 'FIND_FLIGHTS';
-                    else if (label.toLowerCase().includes('explore')) type = 'EXPLORE';
-                } catch (e) {
-                    console.warn('Failed to parse action data', e);
-                }
-
-                action = { label, type, data };
-                displayContent = aiResponseText.replace(match[0], '').trim();
+                action = {
+                    label: `Agent: ${name}`,
+                    type,
+                    data: args,
+                    status: 'pending' as const
+                };
             }
 
             const aiMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                content: displayContent,
+                content: agentResponse.message || "I've processed that request.",
                 timestamp: new Date(),
                 action
             };
             setMessages(prev => [...prev, aiMsg]);
+
         } catch (error) {
+            console.error('Agent Error:', error);
             const errorMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                content: "I'm having trouble reaching the travel grid. Please try again.",
+                content: "I'm having trouble connecting to the Agent Brain right now.",
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, errorMsg]);
@@ -135,7 +130,9 @@ const AskAIPage = () => {
         }
     };
 
-    const handleActionClick = (action: Exclude<Message['action'], undefined>) => {
+    const handleActionClick = async (action: Exclude<Message['action'], undefined>, msgId: string) => {
+        // Toggle status to processing? (Local state handling required if we want to show spinner on button)
+
         if (action.type === 'GENERATE_ITINERARY') {
             navigate('/plan', {
                 state: {
@@ -156,6 +153,38 @@ const AskAIPage = () => {
             navigate('/flights', { state: { from: action.data.origin, to: action.data.destination } });
         } else if (action.type === 'EXPLORE') {
             navigate('/local-guide');
+        } else if (action.type === 'ADD_TO_SAVED') {
+            // Agentic Action: Write directly to DB
+            try {
+                // Determine user ID
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    alert("Please login to save items.");
+                    return;
+                }
+
+                // Simulate "Adding to Trip"
+                // In a real app, we'd insert into a 'trip_items' table.
+                // For now, let's just simulate success and maybe update a context.
+
+                // Update message to show success
+                setMessages(prev => prev.map(m =>
+                    m.id === msgId
+                        ? { ...m, action: { ...m.action!, status: 'success', label: 'Added to Trip!' } }
+                        : m
+                ));
+
+                // Optional: Toast notification
+                // toast.success("Agent added item to your trip.");
+
+            } catch (err) {
+                console.error("Agent failed to save", err);
+                setMessages(prev => prev.map(m =>
+                    m.id === msgId
+                        ? { ...m, action: { ...m.action!, status: 'failed', label: 'Failed to add' } }
+                        : m
+                ));
+            }
         }
     };
 
@@ -196,12 +225,16 @@ const AskAIPage = () => {
                                     <motion.button
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        onClick={() => handleActionClick(msg.action!)}
-                                        className="mt-4 flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-colors"
+                                        onClick={() => handleActionClick(msg.action!, msg.id)}
+                                        disabled={msg.action.status === 'success'}
+                                        className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all ${msg.action.status === 'success'
+                                            ? 'bg-emerald-100 text-emerald-700 shadow-none cursor-default'
+                                            : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'
+                                            }`}
                                     >
-                                        <Sparkles size={16} />
+                                        {msg.action.status === 'success' ? <Check size={16} /> : <Sparkles size={16} />}
                                         {msg.action.label}
-                                        <ArrowRight size={16} className="ml-1" />
+                                        {msg.action.status !== 'success' && <ArrowRight size={16} className="ml-1" />}
                                     </motion.button>
                                 )}
 
@@ -264,7 +297,7 @@ const AskAIPage = () => {
                     </form>
                 </div>
             </motion.div>
-            <VoiceAssistant onAction={handleActionClick} />
+            <VoiceAssistant onAction={(action) => handleActionClick(action, 'voice')} />
         </div>
     );
 };

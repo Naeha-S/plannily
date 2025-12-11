@@ -1,98 +1,131 @@
+import { supabase } from './supabase';
 import { GeminiService } from './gemini';
 import { getUnsplashImage } from './unsplash';
-
 import { OpenAIService } from './openai';
+import { HuggingFaceService } from './huggingface';
+import { STANDARD_DESTINATIONS } from '../data/standardDestinations';
 
-// Smart Fallback Generator: Gemini -> OpenAI
-const generateSmartAI = async (prompt: string) => {
-  // 1. Try Gemini
+// --- Exported Services ---
+
+const extractJson = (text: string) => {
   try {
-    return await GeminiService.generate(prompt);
-  } catch (geminiError) {
-    console.warn('Gemini failed, switching to OpenAI 🟢', geminiError);
+    let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Attempt to extract the first outer JSON object or array
+    const firstObj = clean.indexOf('{');
+    const firstArr = clean.indexOf('[');
+
+    // Check which comes first to decide if it's object or array
+    let start = -1;
+    let end = -1;
+
+    // If both exist, take the earlier one. If only one exists, take that.
+    if (firstObj !== -1 && (firstArr === -1 || firstObj < firstArr)) {
+      start = firstObj;
+      end = clean.lastIndexOf('}');
+    } else if (firstArr !== -1) {
+      start = firstArr;
+      end = clean.lastIndexOf(']');
+    }
+
+    if (start !== -1 && end !== -1) {
+      clean = clean.substring(start, end + 1);
+    }
+
+    return JSON.parse(clean);
+  } catch (e) {
+    console.error('JSON Parse failed', e);
+    // Silent fail/return empty to avoid crashes
+    return {};
+  }
+};
+
+const saveToCache = async (destinations: any[]) => {
+  if (!destinations.length) return;
+
+  const cleanDests = destinations.map(d => ({
+    name: d.name.split(',')[0].trim(),
+    country: d.country || d.name.split(',')[1]?.trim() || 'Unknown',
+    description: d.description,
+    tags: d.tags || [],
+    image_url: d.imageUrl,
+    best_months: []
+  }));
+
+  for (const d of cleanDests) {
+    try {
+      const { data } = await supabase.from('destinations').select('id').eq('name', d.name).limit(1);
+      if (!data?.length) {
+        await supabase.from('destinations').insert(d);
+      }
+    } catch (err) {
+      console.error('Cache save failed for', d.name, err);
+    }
+  }
+};
+
+// Smart Fallback Generator (Defaults to Llama 3.1 8B via HF Router)
+// Smart Fallback Generator (Defaults to Llama 3.1 8B via HF Router)
+export const generateSmartAI = async (prompt: string) => {
+  // 1. Try Hugging Face (Llama 3.1 8B)
+  try {
+    return await HuggingFaceService.chat(prompt);
+  } catch (hfError: any) {
+    console.warn(`Hugging Face (Llama) failed [${hfError.message}], switching to OpenAI 🟡`);
 
     // 2. Try OpenAI
     try {
       return await OpenAIService.generate(prompt);
-    } catch (openAIError) {
-      console.error('All AI models failed 🔴', openAIError);
-      throw new Error('All AI services are currently unavailable. Please check your connection or API keys.');
-    }
-  }
-};
+    } catch (openAIError: any) {
+      console.warn(`OpenAI failed [${openAIError.message}], switching to Gemini 🟢`);
 
-const extractJson = (text: string) => {
-  try {
-    // Try parsing assuming it's clean
-    return JSON.parse(text);
-  } catch (e) {
-    // Try finding JSON block
-    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (jsonMatch) {
+      // 3. Try Gemini
       try {
-        let cleanMatch = jsonMatch[0];
-        // Attempt to fix common standard json issues if parse fails
-        // Remove trailing commas
-        cleanMatch = cleanMatch.replace(/,\s*([\]}])/g, '$1');
-        return JSON.parse(cleanMatch);
-      } catch (e2) {
-        console.error('Failed to parse extracted JSON:', e2);
-      }
-    }
-    // Fallback: simple cleanup
-    let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    // Remove potential comments
-    cleanText = cleanText.replace(/\/\/.*$/gm, '');
-    try {
-      return JSON.parse(cleanText);
-    } catch (e3) {
-      // Last ditch effort: relaxed json parse (e.g. using Function, unsafe but usually ok for AI output in this context if careful)
-      // Or just fail. Let's try to remove control chars.
-      cleanText = cleanText.replace(/[\u0000-\u0019]+/g, "");
-      try {
-        return JSON.parse(cleanText);
-      } catch (e4) {
-        console.error('Final JSON parse attempt failed:', e4);
-        throw new Error('Failed to parse AI response');
+        return await GeminiService.generate(prompt);
+      } catch (geminiError: any) {
+        console.error('All AI models failed 🔴', geminiError);
+        throw new Error('All AI services are currently unavailable.');
       }
     }
   }
 };
-
-import { STANDARD_DESTINATIONS } from '../data/standardDestinations';
 
 export const generateDestinations = async (preferences: any) => {
   const nationalityClause = preferences.nationality
-    ? `User Nationality: ${preferences.nationality}. IMPORTANT: Prioritize destinations that are VISA-FREE or have EASY VISA access for this nationality.`
+    ? `User Nationality: ${preferences.nationality}. Prioritize VISA-FREE or EASY VISA options.`
     : '';
 
   const prompt = `
-    Suggest 15 personalized travel destinations based on:
+    Task: Act as an expert Llama 3 travel agent.
+    Generate exactly 15 travel destination recommendations based on this profile:
+    
     Vibes: ${preferences.vibes.join(', ')}
+    Interests: ${preferences.interests ? preferences.interests.join(', ') : ''}
     Companions: ${preferences.companions}
-    Budget: ${preferences.budget} (User's approx max budget/person)
-    Duration: ${preferences.duration} days
+    Budget: ${preferences.budget}
+    Dates: ${preferences.startDate} to ${preferences.endDate}
     Origin: ${preferences.origin}
     ${nationalityClause}
 
-    Make sure the 15 suggestions are diverse, covering different types of trips fitting the vibes.
-    Provide an ACCURATE cost estimate (including flight) based on the Origin.
+    STRUCTURE THE 15 RESULTS AS FOLLOWS:
+    - 3 "PERFECT" MATCHES (100% aligned with vibes/interests)
+    - 2 "DECENT" MATCHES (Good alternatives, maybe slightly different vibe)
+    - 10 "TRAVEL HOTSPOTS" (Popular major destinations that generally fit, e.g., Paris, Tokyo, Bali)
 
-    Return strictly valid JSON (no markdown, no backticks):
+    Return strictly valid JSON:
     {
       "destinations": [
         {
-          "id": "unique_string",
-          "name": "City, Country",
-          "country": "Country Name",
-          "countryCode": "ISO 2-letter code (e.g. US, FR, JP)",
-          "description": "1 sentence reason matching user vibe.",
-          "imageQuery": "Simple 2-3 word search term for Unsplash (e.g. 'Paris Eiffel')",
-          "matchScore": number (60-100),
-          "tags": ["tag1", "tag2", "tag3"],
-          "weather": { "temp": number, "condition": "String" },
-          "costEstimate": number,
-          "visaInfo": "Short note on visa (e.g. 'Visa-free' or 'E-Visa needed')"
+          "id": "generated_uuid", 
+          "name": "City", 
+          "country": "Country", 
+          "countryCode": "ISO 2-letter",
+          "description": "Why it fits.",
+          "imageQuery": "Visual search term",
+          "matchScore": number (80-100 for Perfect, 60-80 Decent, 50-90 Hotspots),
+          "tags": ["tag1", "tag2"],
+          "weather": { "temp": 25, "condition": "Sunny" },
+          "costEstimate": 1500,
+          "category": "perfect|decent|hotspot"
         }
       ]
     }
@@ -100,319 +133,120 @@ export const generateDestinations = async (preferences: any) => {
 
   try {
     const text = await generateSmartAI(prompt);
-    const data = extractJson(text);
+    const result = extractJson(text);
+    let dests = result.destinations || [];
 
-    // 1. Hydrate AI results with Unsplash images
-    const aiDestinations = await Promise.all(data.destinations.map(async (dest: any) => ({
-      ...dest,
-      imageUrl: await getUnsplashImage(dest.imageQuery || dest.name)
+    // 1. Hydrate Images (Unsplash)
+    dests = await Promise.all(dests.map(async (d: any) => ({
+      ...d,
+      imageUrl: await getUnsplashImage(d.imageQuery || d.name)
     })));
 
-    // 2. Hydrate Standard Destinations with Unsplash images (if not already simulated or cached)
-    // We can simulate or fetch. To be safe, let's fetch real images for them too or use placeholders?
-    // Let's assume we fetch them once or lazily. For now, fetch.
-    const standardDestinations = await Promise.all(STANDARD_DESTINATIONS.map(async (std: any) => ({
-      ...std,
-      imageUrl: await getUnsplashImage(std.imageQuery || std.name),
-      isStandard: true // flag to differentiate in UI if needed
-    })));
+    // 2. Cache to DB
+    await saveToCache(dests);
 
-    // 3. Combine: 15 AI + 15 Standard
-    return { destinations: [...aiDestinations, ...standardDestinations] };
+    return { destinations: dests };
   } catch (error) {
     console.error('Error generating destinations:', error);
-    throw error;
+    return { destinations: STANDARD_DESTINATIONS.slice(0, 5) };
   }
 };
 
 export const generateItinerary = async (request: any) => {
-  const profileContext = request.userProfile ? `
-    User Profile:
-    - Origin: ${request.userProfile.country_of_origin || 'Unknown'}
-    - Currency Preference: ${request.userProfile.currency || 'USD'}
-    - Language: ${request.userProfile.language || 'en'}
-    - Interests: ${request.userProfile.travel_preferences?.interests?.join(', ') || 'General'}
-    - Visas: ${request.userProfile.visas?.join(', ') || 'None'}
-    - Citizenships: ${request.userProfile.citizenships?.join(', ') || 'None'}
-    
-    IMPORTANT: Consider visa requirements if applicable. Quote costs in ${request.userProfile.currency || 'USD'}.
-  ` : '';
-
   const prompt = `
-    Act as a luxury travel planner. Create a detailed ${request.days}-day itinerary for ${request.travelers} people to ${request.destination}.
-    
-    ${profileContext}
-    
-    Preferences:
-    - Budget: ${request.budget}
-    - Pace: ${request.pace} (Important: ${request.pace === 'relaxed' ? 'Include ample breaks and leisure time' : 'Maximize sightseeing'})
-    - Interests: ${request.interests.join(', ')}
-    
-    Constraints & Logic:
-    1. **Cohesion**: Group activities by neighborhood to minimize travel time. Don't jump across the city unnecessarily.
-    2. **Realism**: Include realistic travel times between locations (e.g., "20 mins Metro").
-    3. **Schedule**: 
-       - Morning: 1-2 activities
-       - Lunch: Specific restaurant recommendation
-       - Afternoon: 1-2 activities
-       - Evening: Dinner + Night activity (if applicable)
-    4. **Variety**: Mix sightseeing, food, and relaxation based on interests.
-    5. **Events**: Identify 1-2 unique seasonal events if possible.
-    
-    Return strictly valid JSON (no markdown):
-    {
-      "destination": "${request.destination}",
-      "countryCode": "ISO 2-letter code",
-      "suggestedCurrency": "Currency Code (e.g. JPY, EUR)",
-      "events": [
-        {
-          "id": "evt_1",
-          "name": "Event Name",
-          "date": "YYYY-MM-DD (approximate)",
-          "description": "Short description",
-          "location": "Venue/Area",
-          "type": "festival|concert|exhibition|sports|other",
-          "imageQuery": "Search term"
-        }
-      ],
-      "days": [
-        {
-          "day": number,
-          "theme": "Day Theme (e.g., 'Historic Old Town')",
-          "activities": [
-            {
-              "id": "unique_string",
-              "name": "Activity Name",
-              "type": "sightseeing|food|relaxation|travel|activity",
-              "startTime": "HH:MM",
-              "endTime": "HH:MM",
-              "description": "Engaging description. Mention why it fits the user.",
-              "location": "Address or Area",
-              "cost": number (per person estimate in ${request.userProfile?.currency || 'USD'}),
-              "travelTime": "e.g. 15 mins walk from previous",
-              "travelCost": number (estimate in ${request.userProfile?.currency || 'USD'}),
-              "imageQuery": "Search term"
-            }
-          ]
-        }
-      ]
-    }
-  `;
-
-  try {
-    const text = await generateSmartAI(prompt);
-    const data = extractJson(text);
-
-    // Hydrate Events with Images
-    if (data.events) {
-      data.events = await Promise.all(data.events.map(async (evt: any) => ({
-        ...evt,
-        imageUrl: await getUnsplashImage(evt.imageQuery || evt.name + ' ' + data.destination)
-      })));
-    }
-
-    // Hydrate Activities with Images
-    if (data.days) {
-      data.days = await Promise.all(data.days.map(async (day: any) => ({
-        ...day,
-        activities: await Promise.all(day.activities.map(async (act: any) => ({
-          ...act,
-          imageUrl: await getUnsplashImage(act.imageQuery || act.name + ' ' + data.destination)
-        })))
-      })));
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error generating itinerary:', error);
-    throw error;
-  }
-};
-
-export const regenerateDay = async (currentItinerary: any, dayIndex: number) => {
-  const day = currentItinerary.days[dayIndex];
-  const prompt = `
-        Regenerate Day ${day.day} for a trip to ${currentItinerary.destination}.
-        Previous plan was: ${JSON.stringify(day.activities.map((a: any) => a.name))}.
+        Create a detailed ${request.days}-day trip itinerary for ${request.destination.name}, ${request.destination.country}.
         
-        Goal: Create a COMPLETELY DIFFERENT set of activities for this day, maintaining logical routing and the user's original preferences.
+        Traveler Profile:
+        - Interests: ${JSON.stringify(request.interests)}
+        - Travel Style: ${request.travelStyle}
+        - Group: ${request.travelers}
+        - Budget: ${request.budget}
+        - Dates: ${request.startDate} to ${request.endDate}
         
-        Return strictly valid JSON for a single day object:
+        Context: ${request.flightContext || 'No flight info'}
+        
+        Requirements:
+        - Detailed hourly schedule (Morning, Afternoon, Evening) for each day.
+        - Specific real activity names, restaurants, and hidden gems.
+        - Logic flow between locations (don't jump across city).
+        
+        Return ONLY valid JSON:
         {
-          "day": ${day.day},
-          "theme": "New Theme",
-          "activities": [ ... (same structure as before with cost, travelTime, travelCost, imageQuery) ]
+            "days": [
+                {
+                    "day": 1,
+                    "date": "2024-01-01",
+                    "theme": "Historical Walk",
+                    "activities": [
+                        {
+                            "id": "uuid",
+                            "time": "09:00",
+                            "title": "Activity Name",
+                            "description": "Short description",
+                            "type": "food|activity|relax",
+                            "cost": "$$"
+                        }
+                    ]
+                }
+            ],
+            "suggestedCurrency": "EUR"
         }
     `;
 
   try {
-    const text = await generateSmartAI(prompt);
-    const newDay = extractJson(text);
-
-    // Hydrate images
-    newDay.activities = await Promise.all(newDay.activities.map(async (act: any) => ({
-      ...act,
-      imageUrl: await getUnsplashImage(act.imageQuery || act.name + ' ' + currentItinerary.destination)
-    })));
-
-    return newDay;
+    // EXPLICITLY USE GEMINI / OPENAI for Itinerary (Stronger Logic, Avoid Llama 8B for complex nesting)
+    // Per user request: "every single page except for itinerary generation use only llama"
+    return extractJson(await GeminiService.generate(prompt));
   } catch (error) {
-    console.error('Error regenerating day:', error);
-    throw error;
-  }
-};
-
-export const generateMoreEvents = async (destination: string, date: string) => {
-  const prompt = `
-      Find 4 unique special events, concerts, or festivals in ${destination} around ${date}.
-      Focus on unique, local, or high-profile events.
-      
-      Return strictly valid JSON:
-      [
-        {
-          "id": "unique_id",
-          "name": "Event Name",
-          "date": "YYYY-MM-DD",
-          "description": "Short description",
-          "location": "Venue",
-          "type": "concert|festival|exhibition|other",
-          "imageQuery": "Search term"
-        }
-      ]
-    `;
-
-  try {
-    const text = await generateSmartAI(prompt);
-    const events = extractJson(text);
-
-    // Hydrate with images
-    const eventsWithImages = await Promise.all(events.map(async (evt: any) => ({
-      ...evt,
-      imageUrl: await getUnsplashImage(evt.imageQuery || evt.name + ' ' + destination)
-    })));
-
-    return eventsWithImages;
-  } catch (error) {
-    console.error('Error generating more events:', error);
-    throw error;
-  }
-};
-
-export const findLocalPlaces = async (city: string, context?: { savedTrip?: any }) => {
-  let contextPrompt = '';
-  if (context?.savedTrip) {
-    // Extract activity names to exclude
-    const existingActivities = context.savedTrip.days?.flatMap((d: any) => d.activities?.map((a: any) => a.name)) || [];
-    contextPrompt = `
-      CONTEXT: The user has already planned: ${existingActivities.join(', ')}.
-      Do NOT suggest these again.
-      Suggest 4 NEW hidden gems, unique cafes, or viral spots that a seasoned traveler would know.
-      Focus on "aesthetic" and "authentic" vibes.
-      `;
-  } else {
-    contextPrompt = `
-      Focus on 4 unique, aesthetic, and authentic places (hidden gems, local favorites).
-      Avoid generic tourist traps unless they are absolute must-sees (e.g. Eiffel Tower) but try to find a unique angle.
-      `;
-  }
-
-  const prompt = `
-      Find 4 unique places in ${city} for a local travel guide.
-      ${contextPrompt}
-      
-      Return strictly valid JSON (no markdown):
-      [
-        {
-          "id": "unique_id",
-          "name": "Place Name",
-          "description": "Short alluring description (1 sentence).",
-          "type": "photo|food|gem|scenic|experience",
-          "rating": number (4.0-5.0),
-          "imageQuery": "Simple 2-3 word visual search term (e.g. 'Coffee Shop Paris')",
-          "timings": "e.g. 9AM - 6PM",
-          "viral_factor": "Why is this place viral/special? (e.g. 'Famous for pink walls')",
-          "tips": "One local insider tip."
-        }
-      ]
-    `;
-
-  try {
-    const text = await generateSmartAI(prompt);
-    // Robust JSON cleanup
-    const places = extractJson(text);
-
-    // Hydrate with images
-    const placesWithImages = await Promise.all(places.map(async (place: any) => ({
-      ...place,
-      image: await getUnsplashImage(place.imageQuery || place.name + ' ' + city)
-    })));
-
-    return placesWithImages;
-  } catch (error) {
-    console.error('Error finding local places:', error);
-    throw error;
-  }
-};
-
-export const chatWithAI = async (message: string, context: any) => {
-  // Minimize context to save tokens
-  const minimalContext = context.days?.map((d: any) => ({
-    day: d.day,
-    activities: d.activities.map((a: any) => `${a.startTime}-${a.endTime}: ${a.name}`)
-  }));
-
-  const prompt = `
-    Context: ${JSON.stringify(minimalContext)}
-    User: ${message}
-    
-    Reply concisely as a travel assistant for ${context.destination}.
-  `;
-
-  try {
-    return await generateSmartAI(prompt);
-  } catch (error) {
-    console.error('Error in chat:', error);
-    throw error;
-  }
-};
-
-export const replaceActivity = async (currentActivity: any, dayActivities: any[], destination: string) => {
-  const existingNames = dayActivities.map(a => a.name).join(', ');
-  const prompt = `
-    I need an alternative to this activity: "${currentActivity.name}" (${currentActivity.type}) in ${destination}.
-    Current schedule context: ${existingNames}.
-    
-    Find ONE single activity to replace it.
-    Constraint: It MUST NOT be one of the existing activities: ${existingNames}.
-    Constraint: It should fit the same time slot (${currentActivity.startTime} - ${currentActivity.endTime}).
-    Constraint: Provide a unique, interesting alternative fitting the vibe.
-    
-    Return strictly valid JSON for a single Activity object:
-    {
-       "id": "new_unique_id",
-       "name": "Activity Name",
-       "type": "sightseeing|food|relaxation|travel|activity",
-       "startTime": "${currentActivity.startTime}",
-       "endTime": "${currentActivity.endTime}",
-       "description": "Engaging description.",
-       "location": "Address or Area",
-       "cost": number,
-       "travelTime": "15 mins",
-       "travelCost": number,
-       "imageQuery": "Search term"
+    console.warn('Gemini Itinerary Gen Failed, trying OpenAI fallback', error);
+    try {
+      // Check if openAI key exists before trying? OpenAIService handles logic.
+      return extractJson(await OpenAIService.generate(prompt));
+    } catch (e2) {
+      console.error('Itinerary Gen Failed completely', e2);
+      throw e2;
     }
-  `;
+  }
+};
+
+export const replaceActivity = async (oldActivity: any, allActivities: any[], destination: any) => {
+  const prompt = `
+        Suggest a DIFFERENT activity to replace "${oldActivity.title}" in ${destination.name}.
+        The user wants something else.
+        
+        Current Itinerary Context: ${JSON.stringify(allActivities.map(a => a.title))}
+        
+        Return JSON:
+        {
+             "id": "new_uuid",
+             "time": "${oldActivity.time}",
+             "title": "New Activity Name",
+             "description": "Description",
+             "type": "activity",
+             "cost": "$$"
+        }
+    `;
 
   try {
     const text = await generateSmartAI(prompt);
-    const newActivity = extractJson(text);
-
-    // Hydrate image
-    newActivity.imageUrl = await getUnsplashImage(newActivity.imageQuery || newActivity.name + ' ' + destination);
-
-    return newActivity;
+    return extractJson(text);
   } catch (error) {
-    console.error('Error replacing activity:', error);
+    console.error('Replace Activity Failed', error);
     throw error;
+  }
+};
+
+export const findLocalPlaces = async (query: string, location: string) => {
+  const prompt = `
+        Find 5 specific places for "${query}" near ${location}.
+        Return JSON list: [{ name, type, rating, price }]
+    `;
+  try {
+    const text = await generateSmartAI(prompt);
+    // Helper to handle array return if needed
+    const json = extractJson(text);
+    return Array.isArray(json) ? json : json.places || [];
+  } catch (error) {
+    return [];
   }
 };

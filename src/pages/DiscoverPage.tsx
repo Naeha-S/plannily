@@ -6,6 +6,7 @@ import type { Destination } from '../types';
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { generateDestinations } from '../services/ai';
+import { matchDestinations } from '../services/discovery/brain';
 import { supabase, getProfile } from '../services/supabase';
 
 const DiscoverPage = () => {
@@ -33,9 +34,28 @@ const DiscoverPage = () => {
             }
 
             const enrichData = { ...data, nationality: userNationality };
-            const result = await generateDestinations(enrichData);
-            if (result && result.destinations) {
-                setDestinations(result.destinations);
+
+            // Try new Brain first (DB + Librarian AI)
+            let finalDestinations: any[] = [];
+            try {
+                const brainResults = await matchDestinations(enrichData);
+                if (brainResults.length > 0) {
+                    finalDestinations = brainResults;
+                }
+            } catch (brainErr) {
+                console.warn('Brain retrieval failed, traversing to generative...', brainErr);
+            }
+
+            // Fallback to Generative if Brain empty (DB missing or no match)
+            if (finalDestinations.length === 0) {
+                const result = await generateDestinations(enrichData);
+                if (result && result.destinations) {
+                    finalDestinations = result.destinations;
+                }
+            }
+
+            if (finalDestinations.length > 0) {
+                setDestinations(finalDestinations);
                 setShowResults(true);
             } else {
                 setError('Failed to generate recommendations. Please try again.');

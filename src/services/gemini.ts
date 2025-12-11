@@ -87,28 +87,7 @@ export const GeminiService = {
             }
         }
 
-        console.error('All Gemini models exhausted. Returning simulated fallback.');
-        return JSON.stringify({
-            destination: "Paris (Simulated Fallback)",
-            events: [],
-            days: [
-                {
-                    day: 1,
-                    theme: "City Arrival",
-                    activities: [
-                        {
-                            name: "Arrival & Check-in",
-                            type: "logistics",
-                            startTime: "10:00",
-                            endTime: "12:00",
-                            description: "Arrive at your hotel.",
-                            location: "City Center",
-                            cost: 0,
-                            imageQuery: "hotel"
-                        }
-                    ]
-                }
-            ]
-        });
+        console.error('All Gemini models exhausted.');
+        throw new Error('All Gemini models exhausted');
     }
 };

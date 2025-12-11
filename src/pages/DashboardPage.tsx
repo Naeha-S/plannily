@@ -29,7 +29,8 @@ import { Button } from '../components/common/Button';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ItineraryDay, Activity as ActivityType } from '../types';
-import { getCoordinates, getPlacesNearby } from '../services/opentripmap';
+import { getCoordinates, getPlacesNearby, getPlaceDetails } from '../services/opentripmap';
+import { getWeather, getWeatherCondition } from '../services/openmeteo';
 
 // Fallback Mock Data
 const MOCK_DAYS: ItineraryDay[] = [
@@ -69,7 +70,7 @@ const DashboardPage = () => {
 
     // State
     const [selectedVibe, setSelectedVibe] = useState('chill');
-    const [weather] = useState({ temp: 24, condition: 'Sunny' });
+    const [weather, setWeather] = useState({ temp: 24, condition: 'Sunny', windspeed: 12 });
     const [status, setStatus] = useState<string[]>([]);
 
     // Trip Data State
@@ -119,7 +120,17 @@ const DashboardPage = () => {
 
     const fetchCoords = async (dest: string) => {
         const coords = await getCoordinates(dest);
-        if (coords) setDestinationCoords(coords);
+        if (coords) {
+            setDestinationCoords(coords);
+            const weatherData = await getWeather(coords.lat, coords.lon);
+            if (weatherData) {
+                setWeather({
+                    temp: Math.round(weatherData.current_weather.temperature),
+                    condition: getWeatherCondition(weatherData.current_weather.weathercode),
+                    windspeed: weatherData.current_weather.windspeed
+                });
+            }
+        }
     };
 
     // Calculate Budget dynamically
@@ -243,10 +254,10 @@ const DashboardPage = () => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 border-t border-stone-200/50 pt-4">
                                     <div className="flex items-center gap-2">
-                                        <Wind size={12} /> <span>12 km/h</span>
+                                        <Wind size={12} /> <span>{weather.windspeed} km/h</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Droplets size={12} /> <span>48%</span>
+                                        <Droplets size={12} /> <span>--%</span>
                                     </div>
                                 </div>
                             </div>

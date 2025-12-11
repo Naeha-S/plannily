@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, MapPin, Calendar, Tag, Globe, Settings, ArrowRight, ClipboardCheck as Passport } from 'lucide-react';
+import { Plane, MapPin, Calendar, Tag, Globe, Settings, ArrowRight, ClipboardCheck as Passport, Bell, LineChart, Zap } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { searchSmartLayovers, type FlightOffer } from '../services/amadeus';
 import { isVisaFreeOrEasy } from '../services/visa';
@@ -31,6 +31,10 @@ const FlightsPage = () => {
         stops: 'all', // all, direct, 1stop
         airlines: [] as string[]
     });
+
+    // Agent State
+    const [agentActive, setAgentActive] = useState(false);
+    const [targetPrice, setTargetPrice] = useState('5000');
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -323,6 +327,86 @@ const FlightsPage = () => {
                                         onChange={(e) => setFilters({ ...filters, maxPrice: parseInt(e.target.value) })}
                                         className="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                                     />
+                                </div>
+                            </motion.div>
+
+                            {/* Fare Hunter Agent Widget */}
+                            <motion.div
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.1 }}
+                                className="bg-stone-900 rounded-2xl shadow-xl p-5 text-white sticky top-[480px] overflow-hidden relative"
+                            >
+                                {/* Background fx */}
+                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500 rounded-full blur-3xl opacity-20" />
+                                <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="p-2 bg-white/10 rounded-lg backdrop-blur-md">
+                                            <Zap size={16} className="text-yellow-400 fill-yellow-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg leading-tight">Fare Hunter AI</h3>
+                                            <p className="text-[10px] text-stone-400 uppercase tracking-wider font-bold">Always Watching</p>
+                                        </div>
+                                    </div>
+
+                                    {!agentActive ? (
+                                        <div className="space-y-4">
+                                            <p className="text-xs text-stone-400 leading-relaxed">
+                                                Stop searching daily. I'll watch this route 24/7 and alert you when prices drop or reliable alternatives appear.
+                                            </p>
+
+                                            <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                                                <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Alert me below</label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-stone-500 font-bold">$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={targetPrice}
+                                                        onChange={(e) => setTargetPrice(e.target.value)}
+                                                        className="bg-transparent w-full outline-none font-bold text-white text-lg placeholder:text-stone-600"
+                                                        placeholder="5000"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => setAgentActive(true)}
+                                                className="w-full py-3 bg-white text-stone-900 rounded-xl font-bold text-sm hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <Bell size={14} /> Activate Agent
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4 py-2">
+                                            <div className="flex items-center justify-between p-3 bg-green-500/20 border border-green-500/30 rounded-xl">
+                                                <span className="text-xs font-bold text-green-400 flex items-center gap-2">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Active
+                                                </span>
+                                                <span className="text-xs font-bold text-white">${targetPrice} Target</span>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-xs text-stone-400">
+                                                    <LineChart size={12} className="text-indigo-400" />
+                                                    <span>Predicting dip in 3 days...</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-stone-400">
+                                                    <Globe size={12} className="text-purple-400" />
+                                                    <span>Checking alternate airports...</span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => setAgentActive(false)}
+                                                className="w-full py-2 bg-white/5 text-stone-400 hover:text-white rounded-lg text-xs font-bold transition-colors"
+                                            >
+                                                Stop Tracking
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         </div>

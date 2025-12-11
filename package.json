@@ -10,13 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.80",
     "@elevenlabs/elevenlabs-js": "^2.26.0",
     "@google/generative-ai": "^0.24.1",
+    "@huggingface/inference": "^4.13.5",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
     "@supabase/supabase-js": "^2.86.0",
     "@types/three": "^0.181.0",
     "@vercel/analytics": "^1.6.1",
+    "ai": "^5.0.108",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.25",
     "lucide-react": "^0.555.0",
