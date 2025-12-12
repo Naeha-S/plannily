@@ -147,27 +147,23 @@ const LocalGuidePage = () => {
             const trip = savedTrips.find(t => t.id === selectedTripId);
             if (trip) {
                 setSearchTerm(trip.destination); // Pre-fill search
-                // handleSearch(trip.destination, trip); // Trigger search immediately? Or wait for debounce?
-                // Debounce will pick it up if we set searchTerm.
             }
         }
     }, [selectedTripId]);
 
     useEffect(() => {
         if (debouncedSearchTerm) {
-            const trip = savedTrips.find(t => t.id === selectedTripId);
             // Only use trip context if destination matches (sanity check)
-            const contextTrip = (trip && trip.destination.toLowerCase() === debouncedSearchTerm.toLowerCase()) ? trip : undefined;
-            handleSearch(debouncedSearchTerm, contextTrip);
+            handleSearch(debouncedSearchTerm);
         }
     }, [debouncedSearchTerm, selectedTripId]); // Re-run if trip changes too
 
-    const handleSearch = async (term: string, tripContext?: SavedTrip) => {
+    const handleSearch = async (term: string) => {
         setIsSearching(true);
         setError('');
         try {
-            const context = { savedTrip: tripContext };
-            const data = await findLocalPlaces(term, context);
+            // context param removed as findLocalPlaces expects (query: string, location: string)
+            const data = await findLocalPlaces("hidden gems, unique spots, local favorites", term);
             if (data && data.length > 0) {
                 setResults(data as Place[]);
             } else {

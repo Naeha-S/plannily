@@ -2,10 +2,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// 1. Initialize Gemini
-const genAI = new GoogleGenerativeAI(API_KEY);
-
-
+// Initialize Gemini SDK
+// If API key is missing, subsequent calls will fail gracefully.
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 interface ChatContext {
     userName?: string;
@@ -15,79 +14,84 @@ interface ChatContext {
 
 export const GeminiService = {
     chat: async (message: string, history: any[], context: ChatContext) => {
-        try {
-            // New Model List (Prioritizing 2.5 series as requested)
-            const modelsToTry = [
-                'gemini-2.0-flash-exp', // 2.5 isn't public yet, defaulting to 2.0 experimental which is usually the 'next' version
-                'gemini-1.5-flash'
-            ];
-            // Note: 'gemini-2.5-flash' not yet in public GA lists, sticking to 2.0-flash-exp and 1.5-flash as robust fallbacks
-            // If user specifically requested 2.5, we can try to add it but it might 404.
-            // Let's add them as requested but keeping safe fallbacks.
-            modelsToTry.unshift('gemini-2.0-flash-exp', 'gemma-2-9b-it');
+        if (!genAI) {
+            console.error("Gemini Service: Missing API Key");
+            throw new Error("Gemini API Key missing");
+        }
 
-            // Optimize Context: Strip heavy JSON
+        try {
+            console.log("Gemini Chat: Re-initialized.");
+
+            // Prioritize fast, stable models
+            const modelName = 'gemini-1.5-flash';
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                systemInstruction: "You are Plannily AI. Be specific, concise, and helpful."
+            });
+
+            // Context Formatting
             const minimalContext = `User:${context.userName || 'Guest'},Loc:${context.currentCity || 'Unk'}`;
 
-            // Optimize History: Only keep last 4 turns
+            // History Formatting (Last 4 messages)
             const recentHistory = history.slice(-4).map(msg => ({
                 role: msg.role === 'ai' ? 'model' : 'user',
                 parts: [{ text: msg.content.trim() }]
             }));
 
-            let lastError;
-            for (const modelName of modelsToTry) {
-                try {
-                    const model = genAI.getGenerativeModel({
-                        model: modelName,
-                        systemInstruction: "You are Plannily AI. Be specific and concise."
-                    });
-
-                    const chat = model.startChat({ history: recentHistory });
-                    const result = await chat.sendMessage(`Ctx:[${minimalContext}] ${message}`);
-                    return result.response.text();
-
-                } catch (e: any) {
-                    if (e.status === 429) await new Promise(r => setTimeout(r, 2000));
-                    console.warn(`Gemini switch (${modelName})`);
-                    lastError = e;
+            const chat = model.startChat({
+                history: recentHistory,
+                generationConfig: {
+                    maxOutputTokens: 500,
                 }
-            }
-            throw lastError || new Error("All Gemini models failed");
-        } catch (error) {
+            });
+
+            const result = await chat.sendMessage(`Ctx:[${minimalContext}] ${message}`);
+            return result.response.text();
+
+        } catch (error: any) {
             console.error('Gemini Chat Error:', error);
-            return "I'm optimizing my connections to the travel grid! 🌍 Try scanning a specific plan.";
+            if (error.status === 503) console.warn("Gemini Service Overloaded (503)");
+            throw error;
         }
     },
 
     generate: async (prompt: string) => {
-        // Updated List as requested (falling back to tested models if 2.5 404s)
+        if (!genAI) {
+            console.error("Gemini Service: Missing API Key");
+            throw new Error("Gemini API Key missing");
+        }
+
+        // Robust Fallback List
         const modelsToTry = [
-            'gemini-2.0-flash-exp', // Most capable/likely to work
-            'gemma-2-9b-it',
-            'gemini-1.5-flash',
-            'gemini-2.5-flash' // Added per request, but might not be available yet
+            'gemini-1.5-flash', // Fast, cheap, reliable
+            'gemini-1.5-pro',   // Higher reasoning
+            'gemini-pro'        // Legacy stable
         ];
 
-        // Token Opt: Remove excessive whitespace
         const cleanPrompt = prompt.replace(/\s+/g, ' ').trim();
+        let lastError;
 
         for (const modelName of modelsToTry) {
             try {
+                console.log(`Gemini Gen: Trying ${modelName}...`);
                 const model = genAI.getGenerativeModel({ model: modelName });
+
                 const result = await model.generateContent(cleanPrompt);
                 const response = await result.response;
-                return response.text();
+                const text = response.text();
+
+                if (text) return text;
+
             } catch (e: any) {
-                if (e.message?.includes('429') || e.status === 429) {
-                    // Simple backoff
-                    await new Promise(r => setTimeout(r, 1500));
-                }
-                console.warn(`Gemini Gen (${modelName}):`, e.message?.split('[')[0]);
+                console.warn(`Gemini Gen (${modelName}) failed:`, e.message?.split('[')[0]);
+                lastError = e;
+
+                // Backoff slightly on 429
+                if (e.status === 429) await new Promise(r => setTimeout(r, 1000));
             }
         }
 
         console.error('All Gemini models exhausted.');
-        throw new Error('All Gemini models exhausted');
+        throw lastError || new Error('All Gemini models exhausted');
     }
 };

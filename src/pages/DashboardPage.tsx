@@ -29,7 +29,7 @@ import { Button } from '../components/common/Button';
 import { ItineraryView } from '../components/planner/ItineraryView';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ItineraryDay, Activity as ActivityType } from '../types';
-import { getCoordinates, getPlacesNearby, getPlaceDetails } from '../services/opentripmap';
+import { getCoordinates, getPlacesNearby } from '../services/opentripmap';
 import { getWeather, getWeatherCondition } from '../services/openmeteo';
 
 // Fallback Mock Data
@@ -109,6 +109,22 @@ const DashboardPage = () => {
                 days: location.state.days
             });
             fetchCoords(location.state.destination);
+
+            // Inject Smart Optimizations if available
+            if (location.state.optimizationTips) {
+                const smartAlerts = location.state.optimizationTips.map((tip: any, i: number) => ({
+                    id: `ai-opt-${i}`,
+                    title: tip.title,
+                    desc: `${tip.description} (${tip.impact})`,
+                    icon: tip.type === 'timing' ? Activity : (tip.type === 'saving' ? Wallet : Sparkles),
+                    color: tip.type === 'timing' ? "text-amber-500" : (tip.type === 'saving' ? "text-emerald-500" : "text-blue-500"),
+                    border: tip.type === 'timing' ? 'border-l-amber-500' : (tip.type === 'saving' ? 'border-l-emerald-500' : 'border-l-blue-500'),
+                    action: "Apply"
+                }));
+                // Prepend to existing mock alerts
+                setAlerts(prev => [...smartAlerts, ...prev]);
+            }
+
         } else {
             setTripData({
                 destination: 'Tokyo, Japan (Preview)',

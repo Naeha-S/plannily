@@ -45,17 +45,30 @@ export const DestinationCard = ({ destination, rank, onSelect, startDate }: Dest
                     #{rank} Recommendation
                 </div>
 
-                <div className="absolute bottom-4 left-4 text-white">
-                    <h3 className="text-3xl font-bold mb-1">{destination.name}</h3>
-                    <p className="text-white/90 font-medium">{destination.country}</p>
-                </div>
-
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm h-12 w-12 rounded-full flex items-center justify-center shadow-sm">
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm h-16 w-16 rounded-full flex flex-col items-center justify-center shadow-sm">
                     <div className="text-center">
-                        <span className="block text-xs font-bold text-secondary">{destination.matchScore}%</span>
+                        <span className="block text-sm font-bold text-secondary">{destination.matchScore}%</span>
                         <span className="block text-[10px] text-slate-500 leading-none">Match</span>
                     </div>
                 </div>
+
+                {/* Reason Tag */}
+                {destination.matchReason && (
+                    <div className="absolute bottom-4 left-4 right-4 text-white">
+                        <h3 className="text-3xl font-bold mb-1 drop-shadow-md">{destination.name}</h3>
+                        <p className="text-white/90 font-medium drop-shadow-md mb-2">{destination.country}</p>
+                        <p className="text-xs font-medium bg-black/40 backdrop-blur-md px-3 py-2 rounded-lg inline-block border border-white/20">
+                            ✨ {destination.matchReason}
+                        </p>
+                    </div>
+                )}
+
+                {!destination.matchReason && (
+                    <div className="absolute bottom-4 left-4 text-white">
+                        <h3 className="text-3xl font-bold mb-1 drop-shadow-md">{destination.name}</h3>
+                        <p className="text-white/90 font-medium drop-shadow-md">{destination.country}</p>
+                    </div>
+                )}
             </div>
 
             <div className="p-6">

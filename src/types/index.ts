@@ -12,6 +12,7 @@ export interface Destination {
     description: string;
     imageUrl: string;
     matchScore: number;
+    matchReason?: string;
     tags: string[];
     weather: {
         temp: number;
@@ -58,4 +59,10 @@ export interface Itinerary {
     destination: string;
     days: ItineraryDay[];
     events?: TripEvent[];
+    optimizationTips?: {
+        type: 'swap' | 'timing' | 'saving' | 'alert';
+        title: string;
+        description: string;
+        impact: string; // e.g., "Saves 2h travel"
+    }[];
 }

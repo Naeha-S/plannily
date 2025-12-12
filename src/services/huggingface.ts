@@ -1,15 +1,18 @@
 
-const HF_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY || import.meta.env.VITE_AI_GATEWAY_API_KEY;
+const HF_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY || import.meta.env.VITE_HF_API_KEY;
 
 export const HuggingFaceService = {
-    async chat(prompt: string, model: string = 'meta-llama/Meta-Llama-3.1-8B-Instruct') {
-        if (!HF_API_KEY) throw new Error("HuggingFace API Key missing");
+    async chat(prompt: string, model: string = 'meta-llama/Llama-3.1-8B-Instruct') {
+        if (!HF_API_KEY) {
+            console.error("HuggingFace Service: Missing API Key (VITE_HUGGINGFACE_API_KEY)");
+            throw new Error("HuggingFace API Key missing");
+        }
 
         try {
-            console.log(`HF: Querying ${model} via Router...`);
+            console.log(`HF: Re-initialized Querying ${model} via Router...`);
 
-            // Using the HF Router Endpoint (OpenAI Compatible)
-            // This bypasses SDK auto-routing issues with certain key formats
+            // Re-inserted implementation using HF Router (OpenAI compatible)
+            // Endpoint: https://router.huggingface.co/v1/chat/completions
             const response = await fetch("https://router.huggingface.co/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -21,24 +24,34 @@ export const HuggingFaceService = {
                     messages: [
                         { role: "user", content: prompt }
                     ],
-                    max_tokens: 2000,
+                    max_tokens: 1024,
                     stream: false
                 })
             });
 
             if (!response.ok) {
                 const errText = await response.text();
-                // Check for common auth errors
                 if (response.status === 401) {
-                    throw new Error(`HF Unauthorized (401): Check your API Key. Response: ${errText}`);
+                    // 401 Unauthorized
+                    throw new Error(`HF Unauthorized (401): Invalid Token? Response: ${errText}`);
+                }
+                if (response.status === 404) {
+                    throw new Error(`HF Model Not Found (404): ${model}. Response: ${errText}`);
                 }
                 throw new Error(`HF Router Error: ${response.status} - ${errText}`);
             }
 
             const data = await response.json();
-            return data.choices?.[0]?.message?.content || "";
+
+            // Validate response structure
+            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                throw new Error("HF: Invalid response format received");
+            }
+
+            return data.choices[0].message.content || "";
+
         } catch (error) {
-            console.error('Hugging Face Router Error:', error);
+            console.error('Hugging Face Router Service Error:', error);
             throw error;
         }
     }

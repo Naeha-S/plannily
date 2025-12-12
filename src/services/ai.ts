@@ -7,7 +7,7 @@ import { STANDARD_DESTINATIONS } from '../data/standardDestinations';
 
 // --- Exported Services ---
 
-const extractJson = (text: string) => {
+export const extractJson = (text: string) => {
   try {
     let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
     // Attempt to extract the first outer JSON object or array
@@ -68,6 +68,7 @@ const saveToCache = async (destinations: any[]) => {
 export const generateSmartAI = async (prompt: string) => {
   // 1. Try Hugging Face (Llama 3.1 8B)
   try {
+    // --- RE-INSERTED LLAMA CALL ---
     return await HuggingFaceService.chat(prompt);
   } catch (hfError: any) {
     console.warn(`Hugging Face (Llama) failed [${hfError.message}], switching to OpenAI 🟡`);
@@ -80,6 +81,7 @@ export const generateSmartAI = async (prompt: string) => {
 
       // 3. Try Gemini
       try {
+        // --- RE-INSERTED GEMINI CALL ---
         return await GeminiService.generate(prompt);
       } catch (geminiError: any) {
         console.error('All AI models failed 🔴', geminiError);
@@ -170,6 +172,11 @@ export const generateItinerary = async (request: any) => {
         - Specific real activity names, restaurants, and hidden gems.
         - Logic flow between locations (don't jump across city).
         
+        CRITICAL TASK: Perform a "Smart Route Audit" on your own plan.
+        - Detect if swapping days saves time (e.g., "Day 2 and 3 swap saves 4h").
+        - Suggest better timings (e.g., "Museum X is free Thursday PM").
+        - Identify cost savers.
+
         Return ONLY valid JSON:
         {
             "days": [
@@ -184,9 +191,24 @@ export const generateItinerary = async (request: any) => {
                             "title": "Activity Name",
                             "description": "Short description",
                             "type": "food|activity|relax",
-                            "cost": "$$"
+                            "cost": 25,
+                            "location": "Address or Area"
                         }
                     ]
+                }
+            ],
+            "optimizationTips": [
+                {
+                    "type": "swap", 
+                    "title": "Swap Day 2 & 3",
+                    "description": "Grouping Shibuya areas together saves backtracking.",
+                    "impact": "Saves 2h travel"
+                },
+                {
+                    "type": "timing",
+                    "title": "Visit TeamLabs Early",
+                    "description": "Crowds peak at 11am.",
+                    "impact": "Avoids 1h line"
                 }
             ],
             "suggestedCurrency": "EUR"
@@ -196,6 +218,7 @@ export const generateItinerary = async (request: any) => {
   try {
     // EXPLICITLY USE GEMINI / OPENAI for Itinerary (Stronger Logic, Avoid Llama 8B for complex nesting)
     // Per user request: "every single page except for itinerary generation use only llama"
+    // --- RE-INSERTED GEMINI CALL ---
     return extractJson(await GeminiService.generate(prompt));
   } catch (error) {
     console.warn('Gemini Itinerary Gen Failed, trying OpenAI fallback', error);
@@ -203,8 +226,13 @@ export const generateItinerary = async (request: any) => {
       // Check if openAI key exists before trying? OpenAIService handles logic.
       return extractJson(await OpenAIService.generate(prompt));
     } catch (e2) {
-      console.error('Itinerary Gen Failed completely', e2);
-      throw e2;
+      console.warn('OpenAI fallback failed, attempting Llama as final resort', e2);
+      try {
+        return extractJson(await generateSmartAI(prompt));
+      } catch (e3) {
+        console.error('Itinerary Gen Failed completely', e3);
+        throw e3;
+      }
     }
   }
 };

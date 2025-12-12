@@ -128,6 +128,7 @@ export const VoiceAssistant = ({ onAction }: { onAction: (action: any) => void }
         setAction(null);
 
         try {
+            // --- RE-INSERTED LLAMA CALL ---
             const aiResponse = await HuggingFaceService.chat(
                 `Acting as Cova, a clear, concise, and professional personalized travel assistant.
                 
@@ -136,9 +137,7 @@ export const VoiceAssistant = ({ onAction }: { onAction: (action: any) => void }
 
                 Context: ${JSON.stringify({ userName: 'Traveler', savedTrips: [] })}
                 
-                User Input: "${message}"`,
-                [],
-                { userName: 'Traveler', savedTrips: [] }
+                User Input: "${message}"`
             );
 
             const actionRegex = /<<<ACTION:\s*([^|]+)\s*\|\s*([^>]+)>>>/;
